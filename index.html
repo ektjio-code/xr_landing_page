@@ -58,6 +58,19 @@
     font-variant-numeric:tabular-nums;}
   #brand{position:fixed;top:22px;left:8%;z-index:50;font-size:15px;letter-spacing:.28em;
     font-weight:600;color:var(--ink);}
+
+  /* desktop "view on mobile" toast — matches the warm, restrained product-gallery look */
+  #toast{position:fixed;z-index:70;left:50%;bottom:20%;
+    transform:translateX(-50%) translateY(10px);
+    max-width:min(86vw,400px);padding:16px 22px;
+    background:rgba(36,29,22,.82);backdrop-filter:blur(10px);
+    border:1px solid rgba(232,160,92,.45);border-radius:16px;
+    box-shadow:0 14px 44px rgba(0,0,0,.5);
+    color:var(--ink);font-size:14px;line-height:1.45;text-align:center;
+    opacity:0;pointer-events:none;transition:opacity .35s ease,transform .35s ease;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast b{color:var(--accent);font-weight:600;letter-spacing:.02em;}
+  #toast .t-sub{display:block;margin-top:6px;color:var(--muted);font-size:13px;}
 </style>
 </head>
 <body>
@@ -93,6 +106,7 @@
 </div>
 
 <div id="hint">Scroll to materialize ↓</div>
+<div id="toast"></div>
 
 <script type="importmap">
 { "imports": {
@@ -231,6 +245,15 @@ const isAndroid = /android/i.test(navigator.userAgent);
 // absolute directory URL of this page, so the asset URLs are fully-qualified for the AR launchers
 const baseURL = location.href.split(/[?#]/)[0].replace(/[^/]*$/, '');
 
+let toastTimer=null;
+function showToast(html){
+  const t=document.getElementById('toast');
+  t.innerHTML=html;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'), 4200);
+}
+
 function launchAR(){
   if(isIOS){
     // iOS AR Quick Look — opens straight into native AR with the USDZ. rel="ar" requires
@@ -250,8 +273,8 @@ function launchAR(){
       '#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;' +
       'S.browser_fallback_url=' + fallback + ';end;';
   } else {
-    // Desktop / unsupported — AR needs a phone.
-    alert('Point your phone’s camera here: open this page on iOS or Android to place the Firefly in your room.');
+    // Desktop / unsupported — AR needs a phone; show the on-brand toast.
+    showToast('<b>View on mobile for AR</b><span class="t-sub">Open this page on your iOS or Android phone to place the Firefly in your space.</span>');
   }
 }
 
