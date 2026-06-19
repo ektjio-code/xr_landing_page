@@ -218,13 +218,42 @@ loader.load('firefly.glb', (gltf)=>{
   pivot.add(points);
 
   document.getElementById('loader').classList.add('gone');
-  document.getElementById('arBtn').addEventListener('click', ()=>{
-    alert('In the real build this opens WebAR (model-viewer / USDZ) so the client sees the Firefly in their own room. Stub for the prototype.');
-  });
+  document.getElementById('arBtn').addEventListener('click', launchAR);
 }, undefined, (err)=>{
   document.getElementById('loader').textContent = 'Could not load asset';
   console.error(err);
 });
+
+// ---- "View in your space" → launch NATIVE AR directly (no web 3D viewer) ----
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS reports as Mac
+const isAndroid = /android/i.test(navigator.userAgent);
+// absolute directory URL of this page, so the asset URLs are fully-qualified for the AR launchers
+const baseURL = location.href.split(/[?#]/)[0].replace(/[^/]*$/, '');
+
+function launchAR(){
+  if(isIOS){
+    // iOS AR Quick Look — opens straight into native AR with the USDZ. rel="ar" requires
+    // the anchor to contain exactly one <img> child, then a programmatic click fires it.
+    const a = document.createElement('a');
+    a.setAttribute('rel', 'ar');
+    a.appendChild(document.createElement('img'));
+    a.href = baseURL + 'firefly.usdz';
+    a.click();
+  } else if(isAndroid){
+    // Android Scene Viewer — mode=ar_only goes straight to the camera, skipping the 3D preview.
+    const glb = encodeURIComponent(baseURL + 'firefly.glb');
+    const fallback = encodeURIComponent(location.href);
+    window.location.href =
+      'intent://arvr.google.com/scene-viewer/1.0?file=' + glb +
+      '&mode=ar_only&title=' + encodeURIComponent('XRZENO — Firefly') +
+      '#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;' +
+      'S.browser_fallback_url=' + fallback + ';end;';
+  } else {
+    // Desktop / unsupported — AR needs a phone.
+    alert('Point your phone’s camera here: open this page on iOS or Android to place the Firefly in your room.');
+  }
+}
 
 // ---- scroll → form amount ----
 let targetF=0, curF=0;
