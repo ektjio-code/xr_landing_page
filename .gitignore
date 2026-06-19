@@ -1,0 +1,12 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local archives / manual backups (not source)
+files.zip
+Backup/
+
+# Claude Code local + temp files
+.claude/settings.local.json
+.claude/*.tmp*

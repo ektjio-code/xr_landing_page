@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XRZENO — Materialize</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --stage:#16130f;      /* warm near-black, not pure black, not blue */
+    --stage2:#241d16;
+    --ink:#f3ece1;        /* warm off-white */
+    --muted:#9a8c79;      /* warm grey */
+    --accent:#e8a05c;     /* warm amber — product-light, not neon */
+  }
+  body{background:var(--stage);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    overflow-x:hidden;}
+  #track{height:400vh;position:relative;}
+  #stage{position:sticky;top:0;height:100vh;width:100%;overflow:hidden;}
+  #gl{display:block;width:100%;height:100%;}
+
+  /* type */
+  .copy{position:fixed;z-index:20;pointer-events:none;opacity:0;
+    transition:opacity .7s ease, transform .7s ease;transform:translateY(12px);}
+  .copy.show{opacity:1;transform:translateY(0);}
+  .eyebrow{font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:var(--accent);
+    font-weight:600;margin-bottom:14px;}
+  .lead{font-size:clamp(30px,5.5vw,68px);font-weight:300;letter-spacing:-.02em;line-height:1.05;}
+  .lead b{font-weight:600;}
+  .sub{font-size:clamp(15px,2vw,20px);color:var(--muted);margin-top:16px;font-weight:300;max-width:30ch;}
+
+  #c1{top:50%;left:8%;transform:translateY(-50%);max-width:440px;}
+  #c2{top:50%;left:8%;transform:translateY(-50%);max-width:440px;}
+  #c3{bottom:14%;left:50%;transform:translateX(-50%);text-align:center;}
+
+  /* CTA / AR button */
+  #ar{position:fixed;z-index:30;bottom:11%;left:50%;transform:translateX(-50%) translateY(12px);
+    opacity:0;transition:opacity .6s,transform .6s;pointer-events:none;}
+  #ar.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
+  #ar button{background:transparent;color:var(--ink);border:1px solid rgba(232,160,92,.55);
+    padding:15px 30px;border-radius:100px;font-size:15px;letter-spacing:.02em;cursor:pointer;
+    font-family:inherit;transition:background .3s,border-color .3s;backdrop-filter:blur(6px);}
+  #ar button:hover{background:rgba(232,160,92,.12);border-color:var(--accent);}
+  #ar .note{font-size:12px;color:var(--muted);margin-top:12px;letter-spacing:.04em;}
+
+  #hint{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:40;
+    color:var(--muted);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    animation:fade 2.6s infinite;transition:opacity .4s;}
+  @keyframes fade{0%,100%{opacity:.3}50%{opacity:.8}}
+
+  #loader{position:fixed;inset:0;z-index:60;background:var(--stage);display:flex;
+    align-items:center;justify-content:center;color:var(--muted);font-size:13px;
+    letter-spacing:.2em;text-transform:uppercase;transition:opacity .6s;}
+  #loader.gone{opacity:0;pointer-events:none;}
+
+  #dbg{position:fixed;top:12px;right:14px;z-index:50;font-size:11px;color:#5a4f41;
+    font-variant-numeric:tabular-nums;}
+  #brand{position:fixed;top:22px;left:8%;z-index:50;font-size:15px;letter-spacing:.28em;
+    font-weight:600;color:var(--ink);}
+</style>
+</head>
+<body>
+
+<div id="loader">Preparing the stage…</div>
+<div id="brand">XRZENO</div>
+<div id="dbg">form: <span id="d">0</span>%</div>
+
+<div id="track">
+  <div id="stage"><canvas id="gl"></canvas></div>
+</div>
+
+<div class="copy" id="c1">
+  <div class="eyebrow">From a real scan</div>
+  <div class="lead">Every product<br>begins as <b>points</b>.</div>
+  <div class="sub">We capture your product in the round — thousands of measured points of real geometry.</div>
+</div>
+
+<div class="copy" id="c2">
+  <div class="eyebrow">Brought to life</div>
+  <div class="lead">Then it becomes<br><b>real</b>.</div>
+  <div class="sub">Those points resolve into a faithful, fully textured object — viewable from any angle, in any browser.</div>
+</div>
+
+<div class="copy" id="c3">
+  <div class="lead" style="font-size:clamp(24px,4vw,44px)"><b>Your catalog,</b> in their space.</div>
+  <div class="sub" style="margin:14px auto 0">Drag to explore. Or place it in your own room.</div>
+</div>
+
+<div id="ar">
+  <button id="arBtn">View in your space</button>
+  <div class="note">Opens AR on a phone · drag to rotate on desktop</div>
+</div>
+
+<div id="hint">Scroll to materialize ↓</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const cv = document.getElementById('gl');
+const track = document.getElementById('track');
+let W = innerWidth, H = innerHeight;
+
+const renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(W,H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x16130f); // warm charcoal stage + the dark base the bloom needs
+const camera = new THREE.PerspectiveCamera(38, W/H, 0.01, 100);
+camera.position.set(0, 0, 1.15);
+
+// warm studio lighting — product-gallery, not neon
+const key = new THREE.DirectionalLight(0xfff0dd, 2.4); key.position.set(2,3,2); scene.add(key);
+const fill = new THREE.DirectionalLight(0xcfe0ff, 0.5); fill.position.set(-3,1,1); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffd9a8, 1.4); rim.position.set(0,1,-3); scene.add(rim);
+scene.add(new THREE.AmbientLight(0x4a3f33, 1.2));
+
+// group we spin
+const pivot = new THREE.Group(); scene.add(pivot);
+
+// --- post-processing: real-time bloom so the dots read as EMITTED light, not flat pixels ---
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+// (strength, radius, threshold) — only the bright dot cores bloom; the dark stage stays clean
+const bloom = new UnrealBloomPass(new THREE.Vector2(W,H), 0.85, 0.45, 0.2);
+composer.addPass(bloom);
+composer.addPass(new OutputPass()); // applies tone mapping + sRGB at the end (no double-encode)
+
+// soft round glow sprite for each point — kills the flat-square look, gives a luminous core
+function makeDotSprite(){
+  const s=64, c=document.createElement('canvas'); c.width=c.height=s;
+  const x=c.getContext('2d'), g=x.createRadialGradient(s/2,s/2,0, s/2,s/2,s/2);
+  g.addColorStop(0.0,'rgba(255,255,255,1)');
+  g.addColorStop(0.35,'rgba(255,255,255,0.55)');
+  g.addColorStop(1.0,'rgba(255,255,255,0)');
+  x.fillStyle=g; x.fillRect(0,0,s,s);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+const dotTex = makeDotSprite();
+
+let mesh=null, points=null, pointGeo=null;
+let homePos=null, scatterPos=null, COUNT=36000;
+
+const loader = new GLTFLoader();
+loader.load('firefly.glb', (gltf)=>{
+  const obj = gltf.scene;
+  // find the mesh
+  obj.traverse(o=>{ if(o.isMesh) mesh = o; });
+
+  // center + scale to fit the stage nicely
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x,size.y,size.z);
+  const s = 0.62 / maxDim;
+  obj.position.sub(center);
+  obj.scale.setScalar(s);
+  // re-center after scale via wrapper
+  const wrap = new THREE.Group(); wrap.add(obj);
+  // upright: model extends along -Z; tip it so length is vertical-ish & faces camera
+  wrap.rotation.x = -Math.PI/2 * 0.15;
+  pivot.add(wrap);
+
+  // make the mesh material able to fade
+  mesh.material.transparent = true;
+  mesh.material.opacity = 0;
+
+  // --- sample points off the surface ---
+  // ensure all world matrices reflect the wrap/scale/rotation we just applied
+  scene.updateMatrixWorld(true);
+  const sampler = new MeshSurfaceSampler(mesh).build();
+  homePos = new Float32Array(COUNT*3);
+  scatterPos = new Float32Array(COUNT*3);
+  const colors = new Float32Array(COUNT*3);
+  const tmpP = new THREE.Vector3(), tmpC = new THREE.Color();
+  const hasColor = !!mesh.material.map; // we'll approximate with material color if no easy texel read
+
+  for(let i=0;i<COUNT;i++){
+    sampler.sample(tmpP); // position only — normal/color args must be omitted (passing null crashes the sampler)
+    // transform sample into pivot-local space (apply wrap transforms)
+    tmpP.applyMatrix4(mesh.matrixWorld);
+    pivot.worldToLocal(tmpP);
+    homePos[i*3]=tmpP.x; homePos[i*3+1]=tmpP.y; homePos[i*3+2]=tmpP.z;
+
+    // scatter start: exploded sphere shell around the object
+    const dir = new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize();
+    const r = 0.7 + Math.random()*1.1;
+    scatterPos[i*3]=dir.x*r; scatterPos[i*3+1]=dir.y*r; scatterPos[i*3+2]=dir.z*r;
+
+    // warm point color (sampler color may be flat without texel read; tint warm)
+    colors[i*3]=0.92; colors[i*3+1]=0.74; colors[i*3+2]=0.52;
+  }
+
+  pointGeo = new THREE.BufferGeometry();
+  pointGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(scatterPos),3));
+  pointGeo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  const pMat = new THREE.PointsMaterial({
+    size:0.011, map:dotTex, vertexColors:true, transparent:true, opacity:0.9,
+    depthWrite:false, depthTest:true, blending:THREE.AdditiveBlending, sizeAttenuation:true
+  });
+  points = new THREE.Points(pointGeo, pMat);
+  pivot.add(points);
+
+  document.getElementById('loader').classList.add('gone');
+  document.getElementById('arBtn').addEventListener('click', ()=>{
+    alert('In the real build this opens WebAR (model-viewer / USDZ) so the client sees the Firefly in their own room. Stub for the prototype.');
+  });
+}, undefined, (err)=>{
+  document.getElementById('loader').textContent = 'Could not load asset';
+  console.error(err);
+});
+
+// ---- scroll → form amount ----
+let targetF=0, curF=0;
+function scrollProgress(){
+  const sc = track.offsetHeight - innerHeight;
+  const y = Math.min(Math.max(scrollY,0),sc);
+  return sc>0 ? y/sc : 0;
+}
+function easeInOut(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
+
+// ---- drag to spin ----
+let dragging=false, lastX=0, spinVel=0, userSpin=0;
+cv.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;});
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  const dx=e.clientX-lastX; lastX=e.clientX;
+  userSpin += dx*0.005; spinVel = dx*0.005;
+});
+
+function setForm(f){
+  if(!points||!pointGeo) return;
+  const pos = pointGeo.attributes.position.array;
+  // points fly home over first 70% of scroll
+  const fly = Math.min(1, f/0.7);
+  const e = easeInOut(fly);
+  for(let i=0;i<COUNT;i++){
+    const j=i*3;
+    pos[j]  = scatterPos[j]  + (homePos[j]  - scatterPos[j])*e;
+    pos[j+1]= scatterPos[j+1]+ (homePos[j+1]- scatterPos[j+1])*e;
+    pos[j+2]= scatterPos[j+2]+ (homePos[j+2]- scatterPos[j+2])*e;
+  }
+  pointGeo.attributes.position.needsUpdate = true;
+
+  // mesh fades in over last 45%; points fade FULLY out so the finished figure has ZERO dots
+  const meshIn = Math.max(0, Math.min(1,(f-0.55)/0.45));
+  if(mesh){
+    mesh.material.opacity = meshIn;
+    // while invisible the mesh still writes depth and punches a figure-shaped hole in the
+    // dot cloud (reads as a black silhouette). Don't render it at all until it starts forming.
+    mesh.visible = meshIn > 0;
+  }
+  points.material.opacity = 0.9 * (1 - meshIn);
+  points.visible = meshIn < 1; // hard-hide once fully formed — no stray dots on or around the mesh
+}
+
+function loop(){
+  targetF = scrollProgress();
+  curF += (targetF-curF)*0.1;
+  if(Math.abs(targetF-curF)<0.0004) curF=targetF;
+  setForm(curF);
+
+  // gentle auto-rotate + user drag inertia
+  if(!dragging){ userSpin += spinVel; spinVel *= 0.94; }
+  pivot.rotation.y = curF*0.6 + userSpin + performance.now()*0.00006;
+
+  // UI
+  document.getElementById('d').textContent = Math.round(curF*100);
+  toggle('c1', curF>0.02 && curF<0.32);
+  toggle('c2', curF>0.45 && curF<0.72);
+  toggle('c3', curF>0.82);
+  toggleEl(document.getElementById('ar'), curF>0.85);
+  document.getElementById('hint').style.opacity = curF>0.04?'0':'';
+
+  composer.render();
+  requestAnimationFrame(loop);
+}
+function toggle(id,on){const e=document.getElementById(id); if(e) e.classList.toggle('show',on);}
+function toggleEl(e,on){ if(e) e.classList.toggle('show',on);}
+
+addEventListener('resize',()=>{
+  W=innerWidth;H=innerHeight;
+  renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix();
+  composer.setSize(W,H);
+});
+loop();
+</script>
+</body>
+</html>

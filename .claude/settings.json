@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(curl -s -o /dev/null -w \"existing server: HTTP %{http_code}\\\\n\" --max-time 3 http://127.0.0.1:8000/)",
+      "Bash(curl -s -o /dev/null -w \"site: HTTP %{http_code}\\\\n\" http://127.0.0.1:8000/)",
+      "Bash(curl -s -o /dev/null -w \"glb:  HTTP %{http_code}\\\\n\" http://127.0.0.1:8000/firefly.glb)"
+    ]
+  }
+}
