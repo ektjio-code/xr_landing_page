@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>XRZENO — Materialize</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
@@ -19,6 +19,11 @@
   #track{height:400vh;position:relative;}
   #stage{position:sticky;top:0;height:100vh;width:100%;overflow:hidden;}
   #gl{display:block;width:100%;height:100%;}
+  /* MOBILE (touch): no scrolling — a pinch drives the form. Single fixed viewport. */
+  @media (pointer:coarse){
+    #track{height:100vh;}        /* collapse the 400vh scroll track so the page can't scroll */
+    #stage{touch-action:none;}   /* capture pinch/drag; suppress native scroll + pinch-zoom */
+  }
 
   /* type */
   .copy{position:fixed;z-index:20;pointer-events:none;opacity:0;
@@ -287,15 +292,41 @@ function scrollProgress(){
 }
 function easeInOut(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
 
-// ---- drag to spin ----
+const isMobile = matchMedia('(pointer:coarse)').matches;
+
+// ---- desktop: drag to spin (mobile gets 1-finger rotate in the next step) ----
 let dragging=false, lastX=0, spinVel=0, userSpin=0;
-cv.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;});
-addEventListener('pointerup',()=>dragging=false);
-addEventListener('pointermove',e=>{
-  if(!dragging)return;
-  const dx=e.clientX-lastX; lastX=e.clientX;
-  userSpin += dx*0.005; spinVel = dx*0.005;
-});
+if(!isMobile){
+  cv.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;});
+  addEventListener('pointerup',()=>dragging=false);
+  addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lastX; lastX=e.clientX;
+    userSpin += dx*0.005; spinVel = dx*0.005;
+  });
+}
+
+// ---- mobile: PINCH to form (squeeze) / disperse (spread) — drives targetF instead of scroll ----
+if(isMobile){
+  let pinchDist = null;
+  const touchDist = t => Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
+  cv.addEventListener('touchstart', e=>{
+    if(e.touches.length===2) pinchDist = touchDist(e.touches);
+  }, {passive:true});
+  cv.addEventListener('touchmove', e=>{
+    if(e.touches.length===2){
+      e.preventDefault();                              // block native pinch-zoom
+      const d = touchDist(e.touches);
+      if(pinchDist!==null){
+        const delta = d - pinchDist;                   // >0 = spread, <0 = squeeze
+        // squeeze gathers (targetF→1), spread disperses (targetF→0); span-relative = device-independent
+        targetF = Math.max(0, Math.min(1, targetF - delta/(H*0.6)));
+      }
+      pinchDist = d;
+    }
+  }, {passive:false});
+  cv.addEventListener('touchend', e=>{ if(e.touches.length<2) pinchDist = null; });
+}
 
 function setForm(f){
   if(!points||!pointGeo) return;
@@ -324,7 +355,7 @@ function setForm(f){
 }
 
 function loop(){
-  targetF = scrollProgress();
+  if(!isMobile) targetF = scrollProgress(); // desktop: scroll drives form. mobile: pinch sets targetF.
   curF += (targetF-curF)*0.1;
   if(Math.abs(targetF-curF)<0.0004) curF=targetF;
   setForm(curF);
