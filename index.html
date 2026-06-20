@@ -23,6 +23,7 @@
   @media (pointer:coarse){
     #track{height:100vh;}        /* collapse the 400vh scroll track so the page can't scroll */
     #stage{touch-action:none;}   /* capture pinch/drag; suppress native scroll + pinch-zoom */
+    .copy{display:none!important;} /* mobile: drop the narrative beats (c1/c2/c3) — AR button only */
   }
 
   /* type */
@@ -293,6 +294,7 @@ function scrollProgress(){
 function easeInOut(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
 
 const isMobile = matchMedia('(pointer:coarse)').matches;
+if(isMobile) document.getElementById('hint').textContent = 'Pinch to materialize';
 
 // ---- desktop: drag to spin (mobile 1-finger rotate is handled in the touch block below) ----
 let dragging=false, lastX=0, spinVel=0, userSpin=0;
