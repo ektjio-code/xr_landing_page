@@ -294,7 +294,7 @@ function easeInOut(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
 
 const isMobile = matchMedia('(pointer:coarse)').matches;
 
-// ---- desktop: drag to spin (mobile gets 1-finger rotate in the next step) ----
+// ---- desktop: drag to spin (mobile 1-finger rotate is handled in the touch block below) ----
 let dragging=false, lastX=0, spinVel=0, userSpin=0;
 if(!isMobile){
   cv.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;});
@@ -306,12 +306,13 @@ if(!isMobile){
   });
 }
 
-// ---- mobile: PINCH to form (squeeze) / disperse (spread) — drives targetF instead of scroll ----
+// ---- mobile gestures: 1 finger = rotate, 2 fingers = pinch (squeeze form / spread disperse) ----
 if(isMobile){
-  let pinchDist = null;
+  let pinchDist = null, lastX = 0;
   const touchDist = t => Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
   cv.addEventListener('touchstart', e=>{
-    if(e.touches.length===2) pinchDist = touchDist(e.touches);
+    if(e.touches.length===1){ dragging=true; lastX=e.touches[0].clientX; }   // rotate
+    else if(e.touches.length===2){ dragging=false; pinchDist=touchDist(e.touches); } // pinch
   }, {passive:true});
   cv.addEventListener('touchmove', e=>{
     if(e.touches.length===2){
@@ -323,9 +324,17 @@ if(isMobile){
         targetF = Math.max(0, Math.min(1, targetF - delta/(H*0.6)));
       }
       pinchDist = d;
+    } else if(e.touches.length===1 && dragging){
+      e.preventDefault();
+      const dx = e.touches[0].clientX - lastX; lastX = e.touches[0].clientX;
+      userSpin += dx*0.005; spinVel = dx*0.005;        // same feel as desktop drag (+ inertia in loop)
     }
   }, {passive:false});
-  cv.addEventListener('touchend', e=>{ if(e.touches.length<2) pinchDist = null; });
+  cv.addEventListener('touchend', e=>{
+    if(e.touches.length<2) pinchDist = null;
+    if(e.touches.length===0) dragging=false;                                  // released → inertia
+    else if(e.touches.length===1){ dragging=true; lastX=e.touches[0].clientX; } // 2→1: resume rotate, no jump
+  });
 }
 
 function setForm(f){
