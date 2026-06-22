@@ -305,15 +305,15 @@ function launchAR(){
     const a = document.createElement('a');
     a.setAttribute('rel', 'ar');
     a.appendChild(document.createElement('img'));
-    a.href = baseURL + 'firefly.usdz';
+    a.href = baseURL + 'shinobu_ar.usdz';
     a.click();
   } else if(isAndroid){
     // Android Scene Viewer — mode=ar_only goes straight to the camera, skipping the 3D preview.
-    const glb = encodeURIComponent(baseURL + 'firefly.glb');
+    const glb = encodeURIComponent(baseURL + 'shinobu_ar.glb');
     const fallback = encodeURIComponent(location.href);
     window.location.href =
       'intent://arvr.google.com/scene-viewer/1.0?file=' + glb +
-      '&mode=ar_only&title=' + encodeURIComponent('XRZENO — Firefly') +
+      '&mode=ar_only&title=' + encodeURIComponent('XRZENO — Shinobu') +
       '#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;' +
       'S.browser_fallback_url=' + fallback + ';end;';
   } else {
