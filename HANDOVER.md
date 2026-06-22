@@ -18,7 +18,8 @@ Run over http (NOT file://): `python -m http.server 8000` in this folder → `ht
 - `shinobu.glb` — display hero model (2 glTF meshes → 3 three.js meshes: case `3DModel`, `GlossyCoat`,
   glass `Cylinder`/`BottleGlass`). Materials use clearcoat/specular/ior. **Texture was 4096² → resized
   to 2048²** with gltf-transform (see Perf). Main mesh ~142k tris.
-- `museum_of_ethnography_2k.hdr` — HDRI environment (lighting/reflections only).
+- `museum_of_ethnography_2k.hdr` — old HDRI env. **No longer used** — lighting is now the procedural
+  `RoomEnvironment`. File + `RGBELoader` import kept INTENTIONALLY for an easy revert/A-B. Don't delete.
 - `shinobu_ar.glb` / `shinobu_ar.usdz` — separate AR-optimized models (NOT the display model). The
   `.usdz` is 20 MB (heavy first load — see Backlog).
 
@@ -30,13 +31,15 @@ Run over http (NOT file://): `python -m http.server 8000` in this folder → `ht
   decide later, currently just dropped.)
 
 ## Materials / look (CONFIRMED GOOD — do not re-break)
-- **Glass:** three.js physical **transmission renders as a white slab** in this bloom/HDRI pipeline —
-  DEAD END, abandoned. Glass is faked: **black base color + alpha (opacity 0.12) + envMapIntensity 2.5 +
-  depthWrite:false** → clear label with glassy HDRI reflection highlights. (White base = milky veil; black
+- **Glass:** three.js physical **transmission renders as a white slab** in this bloom/IBL pipeline —
+  DEAD END, abandoned. Glass is faked: **black base color + alpha (opacity 0.12) + envMapIntensity 1.1 +
+  depthWrite:false** → clear label with glassy reflection highlights. (White base = milky veil; black
   base = only reflections show. That's the trick.)
-- **Lighting:** studio key/fill/rim/amb fade to a **40% floor** as it forms (HDRI is directional and
-  leaves sides/rear dark at 0); HDRI does most of the work once formed. `envMapIntensity` 3.0 on
-  non-glass, 1.0… now 2.5 on glass.
+- **Environment / lighting:** IBL is the procedural **`RoomEnvironment`** (`pmrem.fromScene(new
+  RoomEnvironment(), 0.04)`) — neutral studio, generated synchronously (no async load). Retuned for it:
+  `envMapIntensity` **1.3** non-glass / **1.1** glass (were 3.0/2.5 for the dim museum HDR). Studio
+  key/fill/rim/amb fade to a **20% floor** as it forms (`lit = 1 - 0.8*formed`) — RoomEnvironment wraps
+  evenly so it needs little fill. Background stays warm charcoal `#16130f` (bloom's dark base).
 - **Bloom/emission:** for the DOT phase only. `bloom.strength` fades to 0 as formed AND `bloom.enabled`
   flips false once formed (composer skips the passes). Sampler/points: `sampler.sample(tmpP)` position
   arg ONLY (null crashes it).
@@ -50,9 +53,9 @@ First-formation stutter + mobile heat. Causes & fixes, all landed:
 2. **Formation recompile:** rendering formed state DIRECTLY vs through the composer = two shader variants
    (tonemap baked for canvas, not for render-target) → mass recompile on the switch. Fix: **always**
    `composer.render()` (glass is alpha now, composer-safe; no path switch). Direct-render path removed.
-3. **Warm-up reveal:** loader now waits for BOTH model + HDRI, then compiles the formed-state pipeline
-   off-screen via `composer.render()` (renderToScreen=false, both bloom states) so first form doesn't
-   compile live. See `warmupReveal()`.
+3. **Warm-up reveal:** loader waits for the model (env is now synchronous → `envReady` starts true),
+   then compiles the formed-state pipeline off-screen via `composer.render()` (renderToScreen=false, both
+   bloom states) so first form doesn't compile live. See `warmupReveal()`.
 4. **4K texture = 89 MB GPU upload** (decode+mipmap) = the residual stutter. Resized 4096²→2048² (→22 MB)
    with `npx @gltf-transform/cli resize shinobu.glb out.glb --width 2048 --height 2048`. Original 4K is
    in git history.
