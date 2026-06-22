@@ -133,9 +133,10 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 const cv = document.getElementById('gl');
 const track = document.getElementById('track');
 let W = innerWidth, H = innerHeight;
+const isMobile = matchMedia('(pointer:coarse)').matches; // mobile gets lighter settings (pixelRatio, COUNT)
 
 const renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile ? 1.5 : 2)); // cap DPR on phones — Retina is brutal
 renderer.setSize(W,H);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -163,7 +164,8 @@ new RGBELoader().load('museum_of_ethnography_2k.hdr', (hdr)=>{
   scene.environment = pmrem.fromEquirectangular(hdr).texture;
   hdr.dispose();
   pmrem.dispose();
-});
+  envReady = true; warmupReveal();
+}, undefined, ()=>{ envReady = true; warmupReveal(); }); // env failed → still reveal (no env lighting)
 
 // group we spin
 const pivot = new THREE.Group(); scene.add(pivot);
@@ -189,7 +191,31 @@ function makeDotSprite(){
 const dotTex = makeDotSprite();
 
 let meshes=[], points=null, pointGeo=null;
-let homePos=null, scatterPos=null, COUNT=36000;
+let homePos=null, scatterPos=null, COUNT = isMobile ? 16000 : 36000;
+
+// Reveal the page only after BOTH the model and the HDRI are ready — and first compile the
+// FORMED-state material shaders off-screen (tiny render target = same "render to target" variant the
+// composer uses, WITH the env applied) so the very first materialize doesn't hitch on a live compile.
+let modelReady=false, envReady=false, warmedUp=false;
+function warmupReveal(){
+  if(warmedUp || !modelReady || !envReady) return;
+  warmedUp = true;
+  // Put everything in its formed state and render through the ACTUAL composer (output redirected
+  // off-screen so nothing flashes) for both bloom states — this compiles the exact pipeline programs
+  // the first materialize uses, so it doesn't hitch on a live compile.
+  meshes.forEach(m=>{ m.visible = true; if(!m.userData.isGlass) m.material.opacity=1; });
+  const pv = points ? points.visible : false;
+  if(points) points.visible = true;
+  const savedRTS = composer.renderToScreen;
+  composer.renderToScreen = false;
+  bloom.enabled = true;  composer.render(); // dots/bloom variant
+  bloom.enabled = false; composer.render(); // formed (no-bloom) variant
+  composer.renderToScreen = savedRTS;
+  // back to pre-form hidden state; the loop's setForm manages them from here
+  meshes.forEach(m=>{ m.visible = false; if(!m.userData.isGlass) m.material.opacity=0; });
+  if(points) points.visible = pv;
+  document.getElementById('loader').classList.add('gone');
+}
 
 const loader = new GLTFLoader();
 loader.load('shinobu.glb', (gltf)=>{
@@ -275,8 +301,9 @@ loader.load('shinobu.glb', (gltf)=>{
   points = new THREE.Points(pointGeo, pMat);
   pivot.add(points);
 
-  document.getElementById('loader').classList.add('gone');
   document.getElementById('arBtn').addEventListener('click', launchAR);
+  modelReady = true;
+  warmupReveal(); // warms + reveals once the HDRI is also ready
 }, undefined, (err)=>{
   document.getElementById('loader').textContent = 'Could not load asset';
   console.error(err);
@@ -331,7 +358,6 @@ function scrollProgress(){
 }
 function easeInOut(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
 
-const isMobile = matchMedia('(pointer:coarse)').matches;
 if(isMobile) document.getElementById('hint').textContent = 'Pinch to materialize';
 
 // ---- desktop: drag to spin (mobile 1-finger rotate is handled in the touch block below) ----
@@ -377,37 +403,34 @@ if(isMobile){
   });
 }
 
+let lastFormF = -1;
 function setForm(f){
   if(!points||!pointGeo) return;
-  const pos = pointGeo.attributes.position.array;
-  // points fly home over first 70% of scroll
-  const fly = Math.min(1, f/0.7);
-  const e = easeInOut(fly);
-  for(let i=0;i<COUNT;i++){
-    const j=i*3;
-    pos[j]  = scatterPos[j]  + (homePos[j]  - scatterPos[j])*e;
-    pos[j+1]= scatterPos[j+1]+ (homePos[j+1]- scatterPos[j+1])*e;
-    pos[j+2]= scatterPos[j+2]+ (homePos[j+2]- scatterPos[j+2])*e;
+  // Only rewrite + re-upload the COUNT-point buffer when the form amount ACTUALLY changed. It used to
+  // run every frame forever (even formed/idle) = constant CPU + GPU upload = mobile heat. Auto-rotate is
+  // a pivot transform and needs no buffer rewrite, so once settled this drops idle cost to ~0.
+  if(f !== lastFormF){
+    lastFormF = f;
+    const pos = pointGeo.attributes.position.array;
+    const fly = Math.min(1, f/0.7); // points fly home over first 70%
+    const e = easeInOut(fly);
+    for(let i=0;i<COUNT;i++){
+      const j=i*3;
+      pos[j]  = scatterPos[j]  + (homePos[j]  - scatterPos[j])*e;
+      pos[j+1]= scatterPos[j+1]+ (homePos[j+1]- scatterPos[j+1])*e;
+      pos[j+2]= scatterPos[j+2]+ (homePos[j+2]- scatterPos[j+2])*e;
+    }
+    pointGeo.attributes.position.needsUpdate = true;
   }
-  pointGeo.attributes.position.needsUpdate = true;
 
   // mesh fades in over last 45%; points fade FULLY out so the finished figure has ZERO dots
   const meshIn = Math.max(0, Math.min(1,(f-0.55)/0.45));
-  // fade meshes in; keep hidden until forming starts. Glass keeps its transmission. Non-glass goes
-  // FULLY OPAQUE once formed so it lands in the transmission buffer and the glass refracts the label
-  // (transmission ignores objects still flagged transparent → glass would refract only the bright env = white).
+  // fade meshes in; keep hidden until forming starts (an invisible mesh writes depth and punches a
+  // figure-shaped hole in the dot cloud = black silhouette). Non-glass just fades opacity and stays
+  // transparent the whole way (like the old single-mesh path) — NO mid-form opaque flip that pops a frame.
   for(const m of meshes){
-    if(m.userData.isGlass){
-      m.visible = meshIn > 0;
-    } else {
-      m.material.opacity = meshIn;
-      const wantTransparent = meshIn < 1;            // opaque at full form → visible to the glass
-      if(m.material.transparent !== wantTransparent){
-        m.material.transparent = wantTransparent;
-        m.material.needsUpdate = true;               // only at the boundary crossing, not every frame
-      }
-      m.visible = meshIn > 0;
-    }
+    if(!m.userData.isGlass) m.material.opacity = meshIn;
+    m.visible = meshIn > 0;
   }
   points.material.opacity = 0.9 * (1 - meshIn);
   points.visible = meshIn < 1; // hard-hide once fully formed — no stray dots on or around the mesh
@@ -423,6 +446,7 @@ function loop(){
   // lights to zero as it forms, so the finished product is lit purely by the environment.
   const formed = Math.max(0, Math.min(1,(curF-0.55)/0.45));
   bloom.strength = 0.85 * (1 - formed);
+  bloom.enabled = formed < 1; // once formed, skip the bloom passes entirely (glow's gone anyway) → saves GPU
   // keep a studio-light floor at full form (the HDRI is directional and leaves the sides/rear dark)
   const lit = 1 - 0.6*formed;
   key.intensity=KEY0*lit; fill.intensity=FILL0*lit; rim.intensity=RIM0*lit; amb.intensity=AMB0*lit;
@@ -439,11 +463,10 @@ function loop(){
   toggleEl(document.getElementById('ar'), curF>0.85);
   document.getElementById('hint').style.opacity = curF>0.04?'0':'';
 
-  // Transmission (glass) renders wrong inside EffectComposer. Once fully formed the bloom is already
-  // 0, so render the finished product DIRECTLY (glass refracts correctly); keep the composer for the
-  // dots phase where the glow matters.
-  if(formed >= 1) renderer.render(scene, camera);
-  else composer.render();
+  // Always render through the composer — glass is plain alpha now (not transmission), so no need to
+  // bypass it, and NOT switching render paths avoids a full material recompile (that was the formation
+  // stutter). Bloom is disabled once formed, so at rest the composer is just RenderPass + OutputPass.
+  composer.render();
   requestAnimationFrame(loop);
 }
 function toggle(id,on){const e=document.getElementById(id); if(e) e.classList.toggle('show',on);}
