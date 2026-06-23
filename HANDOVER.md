@@ -2,88 +2,88 @@
 
 ## What this is
 Marketing "thesis" hero for **XRZENO** (WebAR product viz for Indonesian FMCG/F&B). Single
-self-contained `index.html` (three.js 0.160 via jsdelivr import map). ~N glowing points scatter,
-gather on interaction, and resolve into a real scanned product — currently the **Shinobu** samurai
-whisky bottle. A "View in your space" button fires native AR.
+self-contained `index.html` (three.js 0.160 via jsdelivr import map). ~36k glowing points scatter,
+gather on interaction, and resolve into the scanned **Shinobu** whisky bottle. "View in your space"
+fires native AR.
 
 Run over http (NOT file://): `python -m http.server 8000` in this folder → `http://127.0.0.1:8000/`.
 
 ## Git / hosting
 - Repo: **https://github.com/ektjio-code/xr_landing_page** (`origin`/`main`). Author `Ed <ed@localhost>`
-  (placeholder email by request). Ignored: `files.zip`, `Backup/`, Claude temp. CRLF warnings harmless.
-- Real AR + on-device perf testing need the live URL — enable **GitHub Pages** (Settings→Pages→main/root)
-  → `https://ektjio-code.github.io/xr_landing_page/`. Phones can't reach a localhost dev server.
+  (placeholder email by request). `.claude/settings.json` shows modified constantly — harness noise,
+  never commit it. Git note: commits intermittently fail "couldn't set refs/heads/main" — just retry
+  (clear stale `.git/*.lock`); pushes need sandbox off.
+- GitHub Pages for real AR + on-device perf testing: `https://ektjio-code.github.io/xr_landing_page/`.
+  Phones can't reach a localhost dev server.
+- **`Backup/index.html`** is a manual safety copy (gitignored). It is CURRENT as of this writing
+  (identical to index.html). If you ever "restore the backup," verify it's current first — an ancient
+  backup caused a big time-wasting detour.
 
-## Assets
-- `shinobu.glb` — display hero model (2 glTF meshes → 3 three.js meshes: case `3DModel`, `GlossyCoat`,
-  glass `Cylinder`/`BottleGlass`). Materials use clearcoat/specular/ior. **Texture was 4096² → resized
-  to 2048²** with gltf-transform (see Perf). Main mesh ~142k tris.
-- `museum_of_ethnography_2k.hdr` — old HDRI env. **No longer used** — lighting is now the procedural
-  `RoomEnvironment`. File + `RGBELoader` import kept INTENTIONALLY for an easy revert/A-B. Don't delete.
-- `shinobu_ar.glb` / `shinobu_ar.usdz` — separate AR-optimized models (NOT the display model). The
-  `.usdz` is 20 MB (heavy first load — see Backlog).
+## Current state (single bottle — CONFIRMED GOOD)
+- **Model:** `shinobu.glb` (case `3DModel`, `GlossyCoat`, glass `BottleGlass`). Texture 2K. Upright
+  along Y → `wrap.rotation.x = 0` (the old `-Math.PI/2*0.15` was a Firefly lean; gone).
+- **Environment:** procedural **`RoomEnvironment`** (neutral; the museum HDRI read too warm — deleted).
+  `pmrem.fromScene(new RoomEnvironment(), 0.04)`. Background stays warm charcoal `#16130f`.
+- **Glass (faked — real transmission renders WHITE in this bloom pipeline, DEAD END):** black base +
+  alpha (opacity 0.2) + `envMapIntensity 2.4` + `clearcoat 1` + FrontSide + `depthWrite false`. The
+  clearcoat gives a Fresnel rim so it reads head-on; black base avoids the milky veil.
+- **Softboxes:** two `RectAreaLight`s (intensity 3, up high) — RoomEnvironment is too even to give the
+  glass crisp highlights up front, so these give it something bright to reflect. Don't fade them.
+- **Lighting:** warm studio key/fill/rim/amb fade to a 40% floor as it forms (`lit = 1 - 0.6*formed`);
+  RoomEnvironment does most of the formed lighting. `envMapIntensity` 1.3 non-glass. Exposure 0.95.
+- **Anti-aliasing:** 4× MSAA on the composer's render targets (`composer.renderTarget1/2.samples = 4`).
+  The renderer's own `antialias:true` is bypassed by post-processing — MUST be on the composer.
+- **Anisotropy:** `getMaxAnisotropy()` on all texture maps (sharp at grazing angles).
+- **Sequence:** scattered dots (no silhouette) → gather → solid bottle, ZERO dots. `sampler.sample(tmpP)`
+  position arg ONLY (null crashes it). Non-glass meshes fade opacity 0→1 then go OPAQUE at full form
+  so the transparent glass sorts over the label.
+- **Bloom:** dots phase only. `bloom.strength` fades to 0 and `bloom.enabled=false` once formed.
 
-## Interaction model
-- **Desktop:** scroll-to-form (400vh track drives `curF` 0→1).
-- **Mobile (`pointer:coarse`):** NO scroll — single fixed viewport, page zoom disabled. **Pinch** drives
-  form (squeeze = gather, spread = disperse); **1-finger drag = rotate**; 2 fingers = pinch. Hint says
-  "Pinch to materialize". Narrative copy (c1/c2/c3) hidden on mobile — AR button only. (Mobile copy:
-  decide later, currently just dropped.)
+## Interaction
+- **Desktop:** scroll-to-form (400vh track), drag to spin.
+- **Mobile (`pointer:coarse`):** NO scroll — pinch to form (squeeze gather / spread disperse),
+  1-finger drag = rotate, page zoom off. Hint "Pinch to materialize". Narrative copy hidden.
 
-## Materials / look (CONFIRMED GOOD — do not re-break)
-- **Glass:** three.js physical **transmission renders as a white slab** in this bloom/IBL pipeline —
-  DEAD END, abandoned. Glass is faked: **black base color + alpha (opacity 0.12) + envMapIntensity 1.1 +
-  depthWrite:false** → clear label with glassy reflection highlights. (White base = milky veil; black
-  base = only reflections show. That's the trick.)
-- **Environment / lighting:** IBL is the procedural **`RoomEnvironment`** (`pmrem.fromScene(new
-  RoomEnvironment(), 0.04)`) — neutral studio, generated synchronously (no async load). Retuned for it:
-  `envMapIntensity` **1.3** non-glass / **1.1** glass (were 3.0/2.5 for the dim museum HDR). Studio
-  key/fill/rim/amb fade to a **20% floor** as it forms (`lit = 1 - 0.8*formed`) — RoomEnvironment wraps
-  evenly so it needs little fill. Background stays warm charcoal `#16130f` (bloom's dark base).
-- **Bloom/emission:** for the DOT phase only. `bloom.strength` fades to 0 as formed AND `bloom.enabled`
-  flips false once formed (composer skips the passes). Sampler/points: `sampler.sample(tmpP)` position
-  arg ONLY (null crashes it).
-- Dot→mesh: points fade fully to 0 + `points.visible=false` when formed (zero dots on the final object).
-  Non-glass meshes fade opacity 0→1 and **stay transparent throughout** (no opaque flip — see Perf).
+## AR (DONE, native — no web viewer)
+- iOS: AR Quick Look `shinobu_1k_ar.usdz` (`rel="ar"`). Android: Scene Viewer `shinobu_1k_ar.glb`,
+  `mode=ar_only`. Desktop: on-brand toast. (AR Quick Look is Safari-only on iOS — Chrome iOS downloads
+  the usdz first, so it launches LATE; the 6MB size keeps that short.)
+- usdz was slimmed 20MB→6MB: 1K texture + binary `.usdc` geometry via **`usd-core`** (pip-installed on
+  this box) — `Usd.Stage.Open(...).Export('x.usdc')` then `UsdUtils.CreateNewUsdzPackage`. Lossless.
 
-## Perf (this session's big fight — all FIXED)
-First-formation stutter + mobile heat. Causes & fixes, all landed:
-1. **Idle waste:** `setForm()` rewrote + re-uploaded the whole point buffer EVERY frame forever. Now
-   gated on `f !== lastFormF` → skips when settled/idle. (Was the mobile-heat-at-rest killer.)
-2. **Formation recompile:** rendering formed state DIRECTLY vs through the composer = two shader variants
-   (tonemap baked for canvas, not for render-target) → mass recompile on the switch. Fix: **always**
-   `composer.render()` (glass is alpha now, composer-safe; no path switch). Direct-render path removed.
-3. **Warm-up reveal:** loader waits for the model (env is now synchronous → `envReady` starts true),
-   then compiles the formed-state pipeline off-screen via `composer.render()` (renderToScreen=false, both
-   bloom states) so first form doesn't compile live. See `warmupReveal()`.
-4. **4K texture = 89 MB GPU upload** (decode+mipmap) = the residual stutter. Resized 4096²→2048² (→22 MB)
-   with `npx @gltf-transform/cli resize shinobu.glb out.glb --width 2048 --height 2048`. Original 4K is
-   in git history.
-5. **Mid-form `transparent→opaque` flip** (leftover from the transmission era) popped one frame. Removed —
-   non-glass stays transparent the whole way (Firefly did this; it's smooth).
-6. **Mobile tier:** `pixelRatio` capped 1.5 (vs 2), `COUNT` 16k (vs 36k desktop).
-- DEAD ENDS, don't retry: physical transmission, half-res bloom (blocky/flickery on the tiny dot sprites),
-  the composer↔direct render switch.
+## Perf (all in)
+First-formation stutter + mobile heat — all fixed:
+- **Always `composer.render()`** (no composer↔direct path switch → no mass shader recompile = the stutter).
+- **Warm-up reveal:** loader waits for the model, pre-compiles the formed pipeline off-screen via the
+  composer (both bloom states) so the first materialize doesn't compile live. See `warmupReveal()`.
+- **Idle-skip:** `setForm` only rewrites/re-uploads the point buffer when `curF` changed (was every
+  frame forever = mobile heat).
+- **Mobile tier:** `pixelRatio` cap 1.5, `COUNT` 16k.
+- DEAD ENDS — do not retry: physical transmission (white), half-res bloom (flickery on the dots), the
+  composer↔direct render switch (stutter).
 
-## AR
-- "View in your space" → native AR, no web viewer. iOS: AR Quick Look `shinobu_ar.usdz` (`rel="ar"`).
-  Android: Scene Viewer `shinobu_ar.glb`, `mode=ar_only`. Desktop: on-brand toast. Ed owns the AR models.
+## Tuning knobs
+`COUNT` 36k/16k; point `size 0.011`; bloom `(0.85, 0.45, 0.2)`; glass `opacity 0.2 / env 2.4 /
+clearcoat 1`; softbox intensity 3; exposure 0.95; light floor `1 - 0.6*formed`; camera FOV 38,
+pos `(0, -0.06, 1.15)`; scale `0.62/maxDim`; fly-home `f/0.7`; mesh fade `(f-0.55)/0.45`; track `400vh`.
+
+## Abandoned this week (don't reopen unless asked)
+- **Hero scene** (`shinobu_hero_scene_2k.glb`, bottle + tray + glasses + whiskey) — deleted. The
+  whiskey LIQUID could never look right: real whiskey is translucent, but transmission renders white
+  here and alpha-faking it is either milky, accumulates to opaque, or (opaque bake) looks like plastic.
+  Molded glass also went opaque from alpha accumulation. Verdict: this pipeline can't do translucent
+  glass+liquid; would need real transmission (direct render, risky) or a baked look. Ed chose the
+  single bottle instead.
 
 ## Backlog
-- **`shinobu_ar.usdz` is 20 MB** (ASCII `.usda` geometry ~11 MB + 8.4 MB 2K PNG). Needs USD tooling to
-  regenerate (binary usdc + smaller texture) → ~3–5 MB. No Mac / no USD lib on this Windows box; parked.
-- **Mobile depth:** optionally drop display texture to 1024² (→5.6 MB GPU) and/or `gltf-transform simplify`
-  the 142k-tri mesh for more iPad headroom.
+- Optional: 1K display texture / mesh decimation if mobile still runs warm (test on device first).
 - Narrative copy on mobile (currently hidden) — design decision pending.
-- Per-texel point color (currently uniform warm tint 0.92,0.74,0.52); reduced-motion; keyboard focus.
+- Reduced-motion, keyboard focus. Per-texel point color (currently uniform warm tint 0.92,0.74,0.52).
 
 ## Working style (Ed)
-One change at a time, test live, eyeball BOTH Chrome + VS Code preview, desktop must stay identical.
+One change at a time, test live, eyeball both Chrome + VS Code preview, desktop must stay identical.
 Discuss/diagnose before patching when asked. Keep a local server running; re-run on request.
-Git note: commits intermittently fail with "couldn't set refs/heads/main" — just retry (clear stale
-.git/*.lock first); pushes need sandbox off.
 
 ## Design intent
 Apple-modern restraint. Warm charcoal stage (`#16130f`), warm amber accent (`#e8a05c`), product's own
-texture carries the color. AVOID near-black + acid-green. One bold move (coalesce + glow); the object is
-the hero.
+texture carries the color. AVOID near-black + acid-green. One bold move (coalesce + glow); object is the hero.
