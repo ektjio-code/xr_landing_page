@@ -154,10 +154,12 @@ const rim = new THREE.DirectionalLight(0xffd9a8, RIM0); rim.position.set(0,1,-3)
 const amb = new THREE.AmbientLight(0x4a3f33, AMB0); scene.add(amb);
 
 // studio softboxes — bright rectangles for the glossy glass to reflect (RoomEnvironment is too even to
-// give crisp glass highlights up front). Don't fade — the formed glass needs them.
-RectAreaLightUniformsLib.init();
-const sboxL = new THREE.RectAreaLight(0xffffff, 3, 0.5, 1.4); sboxL.position.set(-0.7, 0.85, 0.8); sboxL.lookAt(0,0.1,0); scene.add(sboxL);
-const sboxR = new THREE.RectAreaLight(0xffffff, 3, 0.5, 1.4); sboxR.position.set( 0.7, 0.85, 0.8); sboxR.lookAt(0,0.1,0); scene.add(sboxR);
+// give crisp glass highlights up front). DESKTOP ONLY — RectAreaLights are expensive per-pixel on mobile.
+if(!isMobile){
+  RectAreaLightUniformsLib.init();
+  const sboxL = new THREE.RectAreaLight(0xffffff, 3, 0.5, 1.4); sboxL.position.set(-0.7, 0.85, 0.8); sboxL.lookAt(0,0.1,0); scene.add(sboxL);
+  const sboxR = new THREE.RectAreaLight(0xffffff, 3, 0.5, 1.4); sboxR.position.set( 0.7, 0.85, 0.8); sboxR.lookAt(0,0.1,0); scene.add(sboxR);
+}
 
 // Environment for IBL + reflections: procedural RoomEnvironment (neutral — the museum HDRI read too warm).
 // Generated synchronously (no async load).
@@ -170,8 +172,8 @@ const pivot = new THREE.Group(); scene.add(pivot);
 
 // --- post-processing: real-time bloom so the dots read as EMITTED light, not flat pixels ---
 const composer = new EffectComposer(renderer);
-composer.renderTarget1.samples = 4; // MSAA on the composer targets (the renderer's own antialias is bypassed by post-processing)
-composer.renderTarget2.samples = 4;
+composer.renderTarget1.samples = isMobile ? 0 : 4; // 4x MSAA DESKTOP ONLY — multisampled HalfFloat targets are brutal on mobile bandwidth
+composer.renderTarget2.samples = isMobile ? 0 : 4;
 composer.addPass(new RenderPass(scene, camera));
 // (strength, radius, threshold) — only the bright dot cores bloom; the dark stage stays clean
 const bloom = new UnrealBloomPass(new THREE.Vector2(W,H), 0.85, 0.45, 0.2);
@@ -230,8 +232,9 @@ loader.load('shinobu.glb', (gltf)=>{
   obj.scale.setScalar(s);
   // re-center after scale via wrapper
   const wrap = new THREE.Group(); wrap.add(obj);
-  // Shinobu is modeled upright along Y → no tilt, base sits flat/parallel to the ground.
-  wrap.rotation.x = 0;
+  // Shinobu is modeled upright along Y. Slight up-tilt so the face aims up a touch.
+  // Adjust the degrees to taste (more negative = looks further up; flip the sign if it tilts the wrong way).
+  wrap.rotation.x = THREE.MathUtils.degToRad(-4);
   pivot.add(wrap);
 
   // prep materials: glass is FAKED with a black alpha material (three.js physical transmission renders
@@ -253,7 +256,7 @@ loader.load('shinobu.glb', (gltf)=>{
       mat.metalness = 0;
       mat.envMapIntensity = 2.4;   // push reflections so it reads as glass on the soft RoomEnvironment
       mat.depthWrite = false;      // don't occlude the label behind it
-      mat.clearcoat = 1; mat.clearcoatRoughness = 0.08; // glossy coat → Fresnel rim so the glass reads head-on
+      if(!isMobile){ mat.clearcoat = 1; mat.clearcoatRoughness = 0.08; } // glossy coat → Fresnel rim (desktop; clearcoat costs on mobile)
       mat.needsUpdate = true;
     } else {
       // NON-GLASS: keep the reflections for metal / clearcoat, fade via opacity.
