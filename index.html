@@ -229,8 +229,9 @@ loader.load('shinobu.glb', (gltf)=>{
   obj.scale.setScalar(s);
   // re-center after scale via wrapper
   const wrap = new THREE.Group(); wrap.add(obj);
-  // orientation tip (was tuned for Firefly; may need adjusting for Shinobu after first look)
-  wrap.rotation.x = -Math.PI/2 * 0.15;
+  // Shinobu is modeled upright along Y, so no tilt → base sits flat/parallel to the floor (XZ plane).
+  // (Was a leftover -16° Firefly lean.) Adjust here if a deliberate tilt is wanted.
+  wrap.rotation.x = 0;
   pivot.add(wrap);
 
   // prep materials. Glass keeps its real transmission (forcing transparent/opacity alpha-blends it
