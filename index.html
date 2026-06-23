@@ -138,29 +138,29 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile ? 1.5 : 2)); // cap D
 renderer.setSize(W,H);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 0.95;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x16130f); // warm charcoal stage + the dark base the bloom needs
-const camera = new THREE.PerspectiveCamera(30, W/H, 0.01, 100); // narrower FOV = flatter telephoto look
-camera.position.set(0, 0.04, 1.2); // pulled back to keep the zoom; +y raises cam so the item sits lower
+const camera = new THREE.PerspectiveCamera(38, W/H, 0.01, 100);
+camera.position.set(0, -0.06, 1.15); // cam slightly below center → item sits higher on the page
 
 // warm studio lighting — product-gallery, not neon. Faded down as the object forms so the
-// environment (RoomEnvironment) does most of the lighting on the finished product (see loop()).
+// RoomEnvironment does most of the lighting on the finished product (see loop()).
 const KEY0=2.4, FILL0=0.5, RIM0=1.4, AMB0=1.2;
 const key = new THREE.DirectionalLight(0xfff0dd, KEY0); key.position.set(2,3,2); scene.add(key);
 const fill = new THREE.DirectionalLight(0xcfe0ff, FILL0); fill.position.set(-3,1,1); scene.add(fill);
 const rim = new THREE.DirectionalLight(0xffd9a8, RIM0); rim.position.set(0,1,-3); scene.add(rim);
 const amb = new THREE.AmbientLight(0x4a3f33, AMB0); scene.add(amb);
 
-// studio SOFTBOXES — bright rectangles for the glossy glass to reflect (RoomEnvironment is too even to
-// give crisp glass highlights up front). These don't fade — the formed glass needs them.
+// studio softboxes — bright rectangles for the glossy glass to reflect (RoomEnvironment is too even to
+// give crisp glass highlights up front). Don't fade — the formed glass needs them.
 RectAreaLightUniformsLib.init();
 const sboxL = new THREE.RectAreaLight(0xffffff, 3, 0.5, 1.4); sboxL.position.set(-0.7, 0.85, 0.8); sboxL.lookAt(0,0.1,0); scene.add(sboxL);
 const sboxR = new THREE.RectAreaLight(0xffffff, 3, 0.5, 1.4); sboxR.position.set( 0.7, 0.85, 0.8); sboxR.lookAt(0,0.1,0); scene.add(sboxR);
 
-// Environment for IBL + reflections: procedural RoomEnvironment (neutral studio room), generated
-// synchronously (no async load), so envReady starts true below.
+// Environment for IBL + reflections: procedural RoomEnvironment (neutral — the museum HDRI read too warm).
+// Generated synchronously (no async load).
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 pmrem.dispose();
@@ -170,6 +170,8 @@ const pivot = new THREE.Group(); scene.add(pivot);
 
 // --- post-processing: real-time bloom so the dots read as EMITTED light, not flat pixels ---
 const composer = new EffectComposer(renderer);
+composer.renderTarget1.samples = 4; // MSAA on the composer targets (the renderer's own antialias is bypassed by post-processing)
+composer.renderTarget2.samples = 4;
 composer.addPass(new RenderPass(scene, camera));
 // (strength, radius, threshold) — only the bright dot cores bloom; the dark stage stays clean
 const bloom = new UnrealBloomPass(new THREE.Vector2(W,H), 0.85, 0.45, 0.2);
@@ -191,32 +193,28 @@ const dotTex = makeDotSprite();
 let meshes=[], points=null, pointGeo=null;
 let homePos=null, scatterPos=null, COUNT = isMobile ? 16000 : 36000;
 
-// Reveal the page once the model is ready (env is synchronous, so envReady starts true). First compile
-// the FORMED-state pipeline off-screen via the composer so the very first materialize doesn't hitch on
-// a live shader compile.
-let modelReady=false, envReady=true, warmedUp=false; // RoomEnvironment is set synchronously above
+// Reveal once the model is ready (env is synchronous → envReady starts true). First compile the
+// FORMED-state pipeline off-screen via the composer (both bloom states) so the very first materialize
+// doesn't hitch on a live shader compile.
+let modelReady=false, envReady=true, warmedUp=false;
 function warmupReveal(){
   if(warmedUp || !modelReady || !envReady) return;
   warmedUp = true;
-  // Put everything in its formed state and render through the ACTUAL composer (output redirected
-  // off-screen so nothing flashes) for both bloom states — this compiles the exact pipeline programs
-  // the first materialize uses, so it doesn't hitch on a live compile.
   meshes.forEach(m=>{ m.visible = true; if(!m.userData.isGlass) m.material.opacity=1; });
   const pv = points ? points.visible : false;
   if(points) points.visible = true;
   const savedRTS = composer.renderToScreen;
   composer.renderToScreen = false;
-  bloom.enabled = true;  composer.render(); // dots/bloom variant
-  bloom.enabled = false; composer.render(); // formed (no-bloom) variant
+  bloom.enabled = true;  composer.render();
+  bloom.enabled = false; composer.render();
   composer.renderToScreen = savedRTS;
-  // back to pre-form hidden state; the loop's setForm manages them from here
   meshes.forEach(m=>{ m.visible = false; if(!m.userData.isGlass) m.material.opacity=0; });
   if(points) points.visible = pv;
   document.getElementById('loader').classList.add('gone');
 }
 
 const loader = new GLTFLoader();
-loader.load('shinobu_hero_scene_2k.glb', (gltf)=>{
+loader.load('shinobu.glb', (gltf)=>{
   const obj = gltf.scene;
   // Shinobu has multiple meshes/materials — collect them ALL (not just the last one)
   meshes = [];
@@ -232,39 +230,38 @@ loader.load('shinobu_hero_scene_2k.glb', (gltf)=>{
   obj.scale.setScalar(s);
   // re-center after scale via wrapper
   const wrap = new THREE.Group(); wrap.add(obj);
-  // Shinobu is modeled upright along Y, so no tilt → base sits flat/parallel to the floor (XZ plane).
-  // (Was a leftover -16° Firefly lean.) Adjust here if a deliberate tilt is wanted.
+  // Shinobu is modeled upright along Y → no tilt, base sits flat/parallel to the ground.
   wrap.rotation.x = 0;
   pivot.add(wrap);
 
-  // prep materials (bottle method): EVERY transmissive surface → faked clear glass (black base + alpha
-  // + reflections; real transmission renders white in this pipeline). Everything else opaque, fades in.
+  // prep materials: glass is FAKED with a black alpha material (three.js physical transmission renders
+  // as a white slab in this pipeline); non-glass fades via opacity. Anisotropy sharpens textures.
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
   meshes.forEach(m=>{
     const mat = m.material;
-    // anisotropic filtering — sharpens textures at grazing angles (esp. the flat wood tray)
+    // anisotropic filtering — sharpens textures at grazing angles
     for(const map of [mat.map, mat.roughnessMap, mat.metalnessMap, mat.normalMap]) if(map) map.anisotropy = maxAniso;
     if(mat.transmission > 0){
+      // GLASS: three.js physical transmission renders as a white slab in this pipeline, so use a
+      // simple alpha-blended clear glass instead — reliably shows the label behind it with a sheen.
       m.userData.isGlass = true;
       mat.transmission = 0;
-      mat.color.setHex(0x000000);  // black base → only reflections read as glass, no milky veil
-      mat.transparent = true; mat.opacity = 0.2;
-      mat.roughness = 0.06; mat.metalness = 0; // crisp so the softbox reflections read as clean glass glints
-      mat.envMapIntensity = 2.4;   // RoomEnvironment is soft → push reflections so it reads as glass
-      // A closed vessel (the bottle) over a label needs ONE clean layer (FrontSide + no depth-write) or
-      // its walls stack up to black from the front. An open glass needs DoubleSide + depth-write so its
-      // bottom doesn't vanish at angles. They conflict — split by material name.
-      if(/bottle/i.test(mat.name || '')){
-        mat.side = THREE.FrontSide; mat.depthWrite = false;
-      } else {
-        mat.side = THREE.DoubleSide; mat.depthWrite = true;
-      }
+      mat.color.setHex(0x000000);  // BLACK base → no milky white veil; only reflections read as glass
+      mat.transparent = true;
+      mat.opacity = 0.2;           // subtle: keeps the label clear, just darkens slightly
+      mat.roughness = 0.06;
+      mat.metalness = 0;
+      mat.envMapIntensity = 2.4;   // push reflections so it reads as glass on the soft RoomEnvironment
+      mat.depthWrite = false;      // don't occlude the label behind it
+      mat.clearcoat = 1; mat.clearcoatRoughness = 0.08; // glossy coat → Fresnel rim so the glass reads head-on
+      mat.needsUpdate = true;
     } else {
+      // NON-GLASS: keep the reflections for metal / clearcoat, fade via opacity.
       if('envMapIntensity' in mat) mat.envMapIntensity = 1.3;
       mat.transparent = true; mat.opacity = 0;
     }
-    mat.needsUpdate = true;
   });
+
 
   // --- sample points off the surface of ALL meshes ---
   scene.updateMatrixWorld(true); // world matrices must reflect wrap/scale/rotation before sampling
@@ -306,7 +303,7 @@ loader.load('shinobu_hero_scene_2k.glb', (gltf)=>{
 
   document.getElementById('arBtn').addEventListener('click', launchAR);
   modelReady = true;
-  warmupReveal(); // compiles the formed pipeline off-screen, then reveals
+  warmupReveal(); // pre-compiles the formed pipeline off-screen, then reveals
 }, undefined, (err)=>{
   document.getElementById('loader').textContent = 'Could not load asset';
   console.error(err);
@@ -409,9 +406,8 @@ if(isMobile){
 let lastFormF = -1;
 function setForm(f){
   if(!points||!pointGeo) return;
-  // Only rewrite + re-upload the COUNT-point buffer when the form amount ACTUALLY changed. It used to
-  // run every frame forever (even formed/idle) = constant CPU + GPU upload = mobile heat. Auto-rotate is
-  // a pivot transform and needs no buffer rewrite, so once settled this drops idle cost to ~0.
+  // Only rewrite + re-upload the point buffer when the form amount actually changed — it used to run
+  // every frame forever (even idle/formed) = constant CPU + GPU upload = mobile heat.
   if(f !== lastFormF){
     lastFormF = f;
     const pos = pointGeo.attributes.position.array;
@@ -428,17 +424,14 @@ function setForm(f){
 
   // mesh fades in over last 45%; points fade FULLY out so the finished figure has ZERO dots
   const meshIn = Math.max(0, Math.min(1,(f-0.55)/0.45));
-  // fade meshes in; keep hidden until forming starts (an invisible mesh writes depth and punches a
-  // figure-shaped hole in the dot cloud = black silhouette). Non-glass just fades opacity and stays
-  // transparent the whole way (like the old single-mesh path) — NO mid-form opaque flip that pops a frame.
+  // fade meshes in; keep hidden until forming starts. Non-glass goes OPAQUE once formed so the
+  // transparent glass always sorts correctly over the label (left transparent, the glass can go black).
   for(const m of meshes){
     if(m.userData.isGlass){
       m.visible = meshIn > 0;
     } else {
       m.material.opacity = meshIn;
-      // OPAQUE at full form → renders in the opaque pass, so the transparent glass always sorts over
-      // the label. (Left transparent, the case sorts against the glass and the glass goes black.)
-      m.material.transparent = meshIn < 1;
+      m.material.transparent = meshIn < 1;           // opaque at full form so the glass sorts over it (toggle needs no recompile)
       m.visible = meshIn > 0;
     }
   }
@@ -456,9 +449,9 @@ function loop(){
   // product is lit mainly by the environment.
   const formed = Math.max(0, Math.min(1,(curF-0.55)/0.45));
   bloom.strength = 0.85 * (1 - formed);
-  bloom.enabled = formed < 1; // once formed, skip the bloom passes entirely (glow's gone anyway) → saves GPU
-  // small studio-light floor at full form (RoomEnvironment wraps more evenly, so it needs less fill)
-  const lit = 1 - 0.8*formed;
+  bloom.enabled = formed < 1; // skip the bloom passes once formed (glow's gone) → saves GPU
+  // keep a small studio-light floor at full form
+  const lit = 1 - 0.6*formed;
   key.intensity=KEY0*lit; fill.intensity=FILL0*lit; rim.intensity=RIM0*lit; amb.intensity=AMB0*lit;
 
   // gentle auto-rotate + user drag inertia
@@ -472,9 +465,8 @@ function loop(){
   toggleEl(document.getElementById('ar'), curF>0.85);
   document.getElementById('hint').style.opacity = curF>0.04?'0':'';
 
-  // Always render through the composer — glass is plain alpha now (not transmission), so no need to
-  // bypass it, and NOT switching render paths avoids a full material recompile (that was the formation
-  // stutter). Bloom is disabled once formed, so at rest the composer is just RenderPass + OutputPass.
+  // Always render through the composer — glass is plain alpha (not transmission), so no need to bypass
+  // it, and NOT switching render paths avoids a full material recompile (that was the formation stutter).
   composer.render();
   requestAnimationFrame(loop);
 }
