@@ -47,7 +47,10 @@ Run over http (NOT file://): `python -m http.server 8000` in this folder → `ht
 ## Interaction
 - **Desktop:** scroll-to-form (400vh track), drag to spin.
 - **Mobile (`pointer:coarse`):** NO scroll — pinch to form (squeeze gather / spread disperse),
-  1-finger drag = rotate, page zoom off. Hint "Pinch to materialize". Narrative copy hidden.
+  1-finger drag = rotate, page zoom off. Hint "Pinch to materialize".
+- **Page copy is minimal by design:** only `XRZENO` (brand), the materialize hint (Scroll/Pinch), and the
+  "View in your space" AR button. The old scroll-narrative beats (c1/c2/c3), AR sub-note, and loader text
+  were deleted (all viewports) — their CSS + the `toggle()` helper went with them. Don't reintroduce.
 
 ## AR (native, no web viewer)
 - iOS: AR Quick Look `shinobu_2k_ar.usdz` (4.4MB). Android: Scene Viewer `shinobu_2k_ar.glb` (5.1MB),
@@ -110,7 +113,7 @@ env 1.1`; exposure 0.95; light floor `1 - 0.6*formed`; camera FOV 38, pos `(0,-0
 
 ## Backlog
 - Optional 1K display texture / mesh decimation if mobile still runs warm (test on device first).
-- Mobile narrative copy (hidden) — design decision pending. Reduced-motion, keyboard focus.
+- Reduced-motion, keyboard focus. (Narrative copy was removed entirely — no longer a backlog item.)
 
 ## Working style (Ed)
 One change at a time, test live, eyeball both Chrome + VS Code preview, desktop must stay identical.
