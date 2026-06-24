@@ -50,11 +50,19 @@ Run over http (NOT file://): `python -m http.server 8000` in this folder → `ht
   1-finger drag = rotate, page zoom off. Hint "Pinch to materialize". Narrative copy hidden.
 
 ## AR (native, no web viewer)
-- iOS: AR Quick Look `shinobu_1k_ar.usdz`. Android: Scene Viewer `shinobu_1k_ar.glb`, `mode=ar_only`.
-  Desktop: on-brand toast. (Quick Look is Safari-only on iOS; Chrome iOS downloads the usdz first so it
-  launches LATE — the 6MB slimmed size keeps that short.)
-- usdz slimmed 20MB→6MB (1K texture + binary `.usdc`) via **`usd-core`** (pip-installed here):
-  `Usd.Stage.Open(...).Export('x.usdc')` then `UsdUtils.CreateNewUsdzPackage`. Lossless.
+- iOS: AR Quick Look `shinobu_2k_ar.usdz` (4.4MB). Android: Scene Viewer `shinobu_2k_ar.glb` (5.1MB),
+  `mode=ar_only`. Desktop: on-brand toast. (Quick Look is Safari-only on iOS; Chrome iOS downloads the
+  usdz first so it launches LATE — small size keeps that short.)
+- **2K AR assets, compressed — replaced the old 1K slim, now higher-res AND smaller.** Both use a 2048²
+  JPEG texture (q92; the source texture's alpha was fully opaque, so JPEG is safe and visually lossless).
+  Built with **`usd-core`** + Pillow (both pip-installed here):
+  - usdz: flatten stage → binary `.usdc` (geometry 11.5MB ASCII → 3.5MB binary) + rewrite the texture
+    asset path png→jpg, then `UsdUtils.CreateNewUsdzPackage`. **19MB → 4.4MB** at full 2K.
+  - glb: rebuild the GLB buffer swapping the 4096² texture for 2048² JPEG and re-offsetting every
+    bufferView (the image view is mid-buffer, so everything after it shifts). Validated accessor bounds
+    + image decode. **7.2MB → 5.1MB.**
+  - Source high-res originals live in git history at `8e1f42e^` (`shinobu_ar.usdz` 19MB / `shinobu_ar.glb`
+    7.2MB, 4K texture) if you ever need to rebuild.
 
 ## Perf (all in)
 - **Always `composer.render()`** (no composer↔direct path switch → no mass recompile = the stutter).
