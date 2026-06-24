@@ -34,7 +34,8 @@ Run over http (NOT file://): `python -m http.server 8000` in this folder → `ht
 - **Glass — THE WORKING RECIPE (from git 4698e98), keep it simple:** black base + alpha **opacity 0.12**
   + **roughness 0.04** + **envMapIntensity 1.1** + FrontSide + `depthWrite false`. **NO softboxes, NO
   clearcoat, NO DoubleSide, NO point-lights/layers.** Every one of those was tried today and made it
-  worse. Real three.js transmission renders WHITE in this bloom pipeline — dead end, stays faked.
+  worse. (Glass stays faked because it's the proven shipped recipe — NOT because real transmission is
+  broken. The old "transmission whites out in bloom" claim was wrong — see **⚠️ Transmission** below.)
 - **Lighting:** warm studio key/fill/rim/amb fade to a 40% floor as it forms; RoomEnvironment does most
   of the formed lighting. Non-glass `envMapIntensity` 1.3. Exposure 0.95.
 - **Quality (PC/desktop ONLY):** 4× MSAA on the composer targets (`samples = isMobile ? 0 : 4`) +
@@ -61,9 +62,33 @@ Run over http (NOT file://): `python -m http.server 8000` in this folder → `ht
   first materialize doesn't compile live. See `warmupReveal()`.
 - **Idle-skip:** `setForm` only rewrites the point buffer when `curF` changed (was every frame = heat).
 - **Mobile tier:** `pixelRatio` 1.5, `COUNT` 16k, no MSAA/aniso.
-- DEAD ENDS — do not retry: physical transmission (white), half-res bloom (flickery on dots), the
-  composer↔direct switch (stutter), and the whole softbox/clearcoat/point-light/layer/normal-flip
-  glass chase (the lean was the actual answer).
+- DEAD ENDS — do not retry: half-res bloom (flickery on dots), the composer↔direct switch (stutter),
+  and the whole softbox/clearcoat/point-light/layer/normal-flip glass chase (the lean was the actual
+  answer). (Real transmission was previously listed here as "white" — that was WRONG, see below.)
+
+## ⚠️ Transmission — CORRECTED (the earlier note was WRONG)
+Proven live in a standalone test rig (since removed — clean tree). Findings:
+- Real `MeshPhysicalMaterial` transmission on a **clean single-mesh glass** renders **perfectly through
+  the exact hero pipeline** — RoomEnvironment + EffectComposer + UnrealBloom(0.85,0.45,0.2) + OutputPass,
+  bloom ON or OFF. Bloom was never the problem.
+- The original "white slab" was an **oversized `thickness`** (set thicker than the whole model → milky) +
+  the liquid going invisible, misread as the pipeline breaking. Not bloom, not a dead end.
+- A 2nd transmissive **liquid inside the glass does NOT break it** — three.js screen-space transmission
+  simply can't refract another transmissive/transparent mesh, so the liquid vanishes (visible only down
+  the open rim). **Translucent liquid-in-glass is still impossible** (must be opaque to read through walls;
+  faking it with a fresnel emissive looked plastic). Photoreal liquid = bake in Blender or path-trace only.
+- Gotchas that cost hours: the model must be **added to the scene** (`scene.add(obj)` — yes, really), must
+  have **real faces + applied transforms**, and `thickness` must be **sized to the model**.
+- **TESTED on the Shinobu bottle (throwaway copy) → it WHITES OUT. Verdict in.** Root cause: the bottle
+  glass is a **SOLID cylinder, not a hollow thin-walled vessel.** Real transmission treats a solid as a
+  glass ROD/LENS — thick curved volume → heavy lens distortion + grazing-angle mirror rim + bright env
+  reflection = opaque white. The practice tumbler only worked because it's **hollow with thin ~parallel
+  walls** (light enters the outer wall and exits the inner wall a hair later → barely bends → see-through).
+- **THE REAL LESSON:** real glass transmission needs **hollow thin-walled geometry**, full stop. On a
+  solid mesh it can't look like glass. The **fake-alpha recipe is the CORRECT tool** for the hero's solid
+  cylinder (not a compromise) — it lays a dark glassy sheen + reflections over the label instead of trying
+  to refract a solid. **Do NOT retry real transmission on the bottle** unless it's re-modelled hollow
+  (Solidify thin walls + air cavity + label as a separate inner mesh).
 
 ## Tuning knobs
 `COUNT` 36k/16k; point `size 0.011`; bloom `(0.85,0.45,0.2)`; glass `opacity 0.12 / roughness 0.04 /
