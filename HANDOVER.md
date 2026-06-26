@@ -114,7 +114,7 @@ all lights/camera/DOF dialed there first, then ported). Assets in **`Tokonama Sc
 (`shinobu_tokonoma.glb` 26MB single transmission glass, `japanese-room_2K_*.exr` HDRI).
 
 - **Done:** dust→bottle coalesce (samples bottle only), **set fades in at the form tail**; bloom on the
-  dust embers (manual UnrealBloom, fades as it forms); constrained **±45° orbit** (locked zoom/pan, baked
+  dust embers (now spec-matched to index2); constrained **±45° orbit** (locked zoom/pan, baked
   start cam); **mask-blur DOF** (bottle stays sharp via a silhouette mask, set goes soft — depth-independent,
   because bottle≈background distance is tiny); **real transmission** glass; baked lights (shoji `SpotLight`
   casting the lattice grid + a museum down-`SpotLight`, env at intensity 0); brand + hint + **AR button**
@@ -130,8 +130,14 @@ all lights/camera/DOF dialed there first, then ported). Assets in **`Tokonama Sc
   - **Don't put a reflection probe on the lacquer tray** — it mirrored the bright plaster walls and washed
     the dark wood uniformly pale. Removed → natural `DarkWood`+clearcoat. (And a *smooth* env on a clearcoat
     reads as a uniform pale film; keep the transient env dark — see `makeDarkEnv`.)
-  - **UnrealBloomPass additively blends onto the target** and does NOT copy the base — `copyTex(sharp→bloomRT)`
-    first, then `bloom.render`. Glow tuned hot: strength 1.3, radius 0.7, threshold 0.0.
+  - **Bloom MUST be a native composer pass** (`composite → bloom → OutputPass`), like index2. Calling
+    `bloom.render()` manually never composites the glow → orbs look like matte dots ("no emission"), no
+    matter how bright. The dust/bloom is now **spec-identical to index2**: bloom 0.85/0.45/0.2,
+    `strength=0.85·(1−formed)`, `enabled=formed<1`; bg `0x16130f`; additive dots `(0.92,0.74,0.52)`,
+    `size=maxDim·0.0177`, scatter `1.13–2.9×maxDim`, opacity 0.9.
+  - **Only deliberate difference from index2 = motion.** index2 spins the whole pivot forever; ours has a
+    fixed scene + the locked ±45° camera, so the dust **spirals-in and unwinds to a clean lock by 70%**
+    (`dustPivot.rotation.y = (1−curF/0.7)·1.3 + drift`) instead of spinning the bottle.
 
 ## Abandoned (don't reopen unless asked)
 - **Hero scene** (`shinobu_hero_scene_2k.glb`, bottle+tray+glasses+whiskey) — deleted. Translucent

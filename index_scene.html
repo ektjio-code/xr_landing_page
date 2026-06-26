@@ -73,7 +73,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.transmissionResolutionScale = isMobile ? 0.5 : 1.0; // full transmission res on desktop, half on mobile
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x100b07);
+scene.background = new THREE.Color(0x16130f); // index2 warm-charcoal stage
 const camera = new THREE.PerspectiveCamera(40, W/H, 0.01, 1000);
 
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -197,11 +197,11 @@ const CompositeShader = {
     }`
 };
 const compositePass = new ShaderPass(CompositeShader);
+// bloom the dust embers as a NATIVE composer pass (exactly like index2): composite -> bloom -> output
+const bloom = new UnrealBloomPass(new THREE.Vector2(W,H), 0.85, 0.45, 0.2);
 composer.addPass(compositePass);
+composer.addPass(bloom);
 composer.addPass(new OutputPass());
-
-// bloom for the dust embers (fades out as the bottle forms). (strength, radius, threshold)
-const bloom = new UnrealBloomPass(new THREE.Vector2(W,H), 1.3, 0.7, 0.0);
 
 function renderMaskBlur(){
   camera.layers.set(0);
@@ -345,7 +345,8 @@ new GLTFLoader().load('Tokonama%20Scene/shinobu_tokonoma.glb', async (gltf)=>{
   });
   const sbox = new THREE.Box3(); sampleMeshes.forEach(m=>sbox.expandByObject(m));
   const bcenter = sbox.getCenter(new THREE.Vector3());
-  const bdiag = sbox.getSize(new THREE.Vector3()).length() || 1;
+  const bsz = sbox.getSize(new THREE.Vector3());
+  const maxDim = Math.max(bsz.x, bsz.y, bsz.z) || 1; // index2 used the model's maxDim (normalized to 0.62)
   homePos = new Float32Array(COUNT*3); scatterPos = new Float32Array(COUNT*3);
   const colors = new Float32Array(COUNT*3), tmpP = new THREE.Vector3();
   const vc = sampleMeshes.map(m=>m.geometry.attributes.position.count), tv = vc.reduce((a,b)=>a+b,0)||1;
@@ -358,16 +359,16 @@ new GLTFLoader().load('Tokonama%20Scene/shinobu_tokonoma.glb', async (gltf)=>{
       // store RELATIVE to the bottle centre so the dust cloud can float (rotate) around it
       homePos[idx*3]=tmpP.x-bcenter.x; homePos[idx*3+1]=tmpP.y-bcenter.y; homePos[idx*3+2]=tmpP.z-bcenter.z;
       const dir = new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize();
-      const rr = bdiag*(0.7+Math.random()*1.6);  // wider scatter shell → less dense
+      const rr = maxDim*(1.13+Math.random()*1.77);  // index2 shell: 0.7–1.8 around a 0.62 model → 1.13–2.9× maxDim
       scatterPos[idx*3]=dir.x*rr; scatterPos[idx*3+1]=dir.y*rr; scatterPos[idx*3+2]=dir.z*rr;
-      colors[idx*3]=0.92; colors[idx*3+1]=0.74; colors[idx*3+2]=0.52;
+      colors[idx*3]=0.92; colors[idx*3+1]=0.74; colors[idx*3+2]=0.52; // index2 exact warm tint
     }
   });
   pointGeo = new THREE.BufferGeometry();
   pointGeo.setAttribute('position', new THREE.BufferAttribute(scatterPos.slice(), 3));
   pointGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   points = new THREE.Points(pointGeo, new THREE.PointsMaterial({
-    size: bdiag*0.045, map: dotTex, vertexColors: true, transparent: true, opacity: 0.95,
+    size: maxDim*0.0177, map: dotTex, vertexColors: true, transparent: true, opacity: 0.9, // index2 size 0.011 on a 0.62 model
     depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true
   }));
   dustPivot = new THREE.Group(); dustPivot.position.copy(bcenter); dustPivot.add(points); scene.add(dustPivot);
@@ -392,10 +393,9 @@ new GLTFLoader().load('Tokonama%20Scene/shinobu_tokonoma.glb', async (gltf)=>{
   { const _se=scene.environment; scene.environment=null; rebakeProbe(); scene.environment=_se; } // bake probe with env OFF → reflects lit geometry only, not the smooth gradient
   probeBaked=true;
   setForm(0.7); blurOn=false; warmFrame();
-  setForm(0);  blurOn=false;
+  setForm(0);  blurOn=false; bloom.enabled=true; bloom.strength=0.85;
   await renderer.compileAsync(scene, camera);   // dust: PointsMaterial
-  warmFrame();
-  copyTex(sharpRT.texture, bloomRT); bloom.render(renderer, bloomRT, sharpRT, 0, false); // compile bloom + copy behind the loader
+  warmFrame();                                   // composer.render runs the bloom pass → compiles it
   lastFormF = -1; setForm(0);
 
   loader.classList.add('hide');
@@ -454,20 +454,17 @@ document.getElementById('arBtn').addEventListener('click', launchAR);
   if(!isMobile) targetF = scrollProgress();          // desktop: page scroll drives form
   curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
   setForm(curF);
-  if(dustPivot) dustPivot.rotation.y = performance.now()*0.00006 * (1 - clamp(curF/0.55)); // slow float, fades as it forms
+  if(dustPivot){ const u = 1 - clamp(curF/0.7); dustPivot.rotation.y = u*1.3 + performance.now()*0.00006*u; } // index2-style swirl: spiral-in + drift, unwinds to a clean lock by 70%
   blurOn = modelReady && curF>0.92;                  // DOF only once formed (don't blur the dust)
   arEl.classList.toggle('show', curF>0.85);          // AR button appears once formed
   hintEl.style.opacity = curF>0.04 ? '0' : '';       // hint fades the moment you start
   controls.update();
   renderMaskBlur();
-  // bloom the dust embers — strength fades 0.85→0 as the bottle forms, off once fully formed
-  let sharpTex = sharpRT.texture;
-  if(modelReady && curF < 1){
-    const formed = clamp((curF-0.55)/0.45);
-    bloom.strength = 1.3 * (1 - formed);
-    if(bloom.strength > 0.001){ copyTex(sharpRT.texture, bloomRT); bloom.render(renderer, bloomRT, sharpRT, 0, false); sharpTex = bloomRT.texture; }
-  }
-  compositePass.uniforms.tSharp.value   = sharpTex;
+  // bloom the dust embers — strength fades 0.85→0 as it forms, pass off once fully formed (index2)
+  const formed = clamp((curF-0.55)/0.45);
+  bloom.strength = 0.85 * (1 - formed);
+  bloom.enabled  = modelReady && formed < 1;
+  compositePass.uniforms.tSharp.value   = sharpRT.texture;
   compositePass.uniforms.tBlur.value    = blurB.texture;
   compositePass.uniforms.tMask.value    = maskFeather.texture;
   compositePass.uniforms.uEnabled.value = blurOn ? 1 : 0;
