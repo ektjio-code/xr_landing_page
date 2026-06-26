@@ -106,6 +106,33 @@ Proven live in a standalone test rig (since removed — clean tree). Findings:
 env 1.1`; exposure 0.95; light floor `1 - 0.6*formed`; camera FOV 38, pos `(0,-0.06,1.15)`;
 `wrap.rotation.x = -Math.PI/2*0.15` (the lean — leave it); scale `0.62/maxDim`.
 
+## 🚧 Tokonoma "scene materialize" page — WIP (NOT live; hero index.html untouched)
+A second, richer landing: the Shinobu bottle materializes from dust **inside a tokonoma alcove** (tray,
+shoji, hanging scroll, plaster walls). Built in **`index_scene.html`**; runs **three 0.169** (not 0.160 —
+needs `environmentRotation`/`environmentIntensity`). Reference rig: **`tokonoma_view.html`** (scene-only,
+all lights/camera/DOF dialed there first, then ported). Assets in **`Tokonama Scene/`**
+(`shinobu_tokonoma.glb` 26MB single transmission glass, `japanese-room_2K_*.exr` HDRI).
+
+- **Done:** dust→bottle coalesce (samples bottle only), **set fades in at the form tail**; bloom on the
+  dust embers (manual UnrealBloom, fades as it forms); constrained **±45° orbit** (locked zoom/pan, baked
+  start cam); **mask-blur DOF** (bottle stays sharp via a silhouette mask, set goes soft — depth-independent,
+  because bottle≈background distance is tiny); **real transmission** glass; baked lights (shoji `SpotLight`
+  casting the lattice grid + a museum down-`SpotLight`, env at intensity 0); brand + hint + **AR button**
+  (same bottle-only `shinobu_2k_ar.*`). Desktop full quality, **mobile tier gated by `isMobile`** (½ shadow,
+  ½ transmission res, 1 blur pass, no MSAA, 16k pts).
+- **NOT done:** real **phone test** (mobile tier coded, unverified); not swapped into the live hero.
+- **LESSONS (load-bearing):**
+  - **First-form stutter = parallel shader compile.** `renderer.compile()`+render does NOT block with
+    `KHR_parallel_shader_compile`; the link finalizes on first real use → hitch. Fix = **`await
+    renderer.compileAsync(scene,camera)`** in the warm-up (cover formed + dust states). This was THE fix.
+  - **Real transmission re-renders the whole scene per frame** (the cost the hero faked away). Half-res on
+    mobile via `renderer.transmissionResolutionScale`.
+  - **Don't put a reflection probe on the lacquer tray** — it mirrored the bright plaster walls and washed
+    the dark wood uniformly pale. Removed → natural `DarkWood`+clearcoat. (And a *smooth* env on a clearcoat
+    reads as a uniform pale film; keep the transient env dark — see `makeDarkEnv`.)
+  - **UnrealBloomPass additively blends onto the target** and does NOT copy the base — `copyTex(sharp→bloomRT)`
+    first, then `bloom.render`. Glow tuned hot: strength 1.3, radius 0.7, threshold 0.0.
+
 ## Abandoned (don't reopen unless asked)
 - **Hero scene** (`shinobu_hero_scene_2k.glb`, bottle+tray+glasses+whiskey) — deleted. Translucent
   whiskey + molded glass can't be done in this fake-alpha pipeline (milky / accumulates opaque / plastic

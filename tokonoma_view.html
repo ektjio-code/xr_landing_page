@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tokonoma Scene — viewer</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0e0c0a;overflow:hidden;font-family:system-ui,sans-serif}
+  #gl{display:block;width:100vw;height:100vh}
+  #hud{position:fixed;top:12px;left:14px;color:#b6a890;font-size:12px;line-height:1.7;
+    background:rgba(0,0,0,.4);padding:10px 13px;border-radius:8px;backdrop-filter:blur(6px);max-width:360px;z-index:10}
+  #hud b{color:#e8a05c}
+  #loader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#b6a890;font-size:14px;background:#0e0c0a;z-index:5;transition:opacity .6s}
+  #loader.hide{opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="loader">loading scene…</div>
+<div id="hud">
+  <b>Tokonoma scene</b> — mask blur (bottle sharp, set soft)<br>
+  drag = orbit (±45° from front) · zoom &amp; pan locked<br>
+  <b>C</b> log cam · <b>R</b> reset · <b>[ ]</b> exposure · <b>D</b> blur · <b>E</b> env · <b>B</b> bg<br>
+  <span id="status">…</span>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+RectAreaLightUniformsLib.init();
+
+const cv = document.getElementById('gl');
+const statusEl = document.getElementById('status');
+const loader = document.getElementById('loader');
+let W = innerWidth, H = innerHeight;
+const MASK_LAYER = 1;
+
+const renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(W,H);
+renderer.setClearColor(0x000000, 1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+let exposure = 1.0; renderer.toneMappingExposure = exposure;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x100b07);
+const camera = new THREE.PerspectiveCamera(40, W/H, 0.01, 1000);
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+function makeWarmEnv(){
+  const c=document.createElement('canvas'); c.width=512; c.height=256;
+  const x=c.getContext('2d'); const g=x.createLinearGradient(0,0,0,256);
+  g.addColorStop(0.00,'#6b5238'); g.addColorStop(0.45,'#3a2c1d');
+  g.addColorStop(0.55,'#281d13'); g.addColorStop(1.00,'#0d0905');
+  x.fillStyle=g; x.fillRect(0,0,512,256);
+  const t=new THREE.CanvasTexture(c);
+  t.mapping=THREE.EquirectangularReflectionMapping; t.colorSpace=THREE.SRGBColorSpace;
+  const env=pmrem.fromEquirectangular(t).texture; t.dispose(); return env;
+}
+const warmEnv = makeWarmEnv();
+let hdrEnv = null, hdrTex = null, bgHdr = false;
+let envMode = 'off';
+scene.environment = null;
+scene.environmentIntensity = 0;
+
+new EXRLoader().load('Tokonama%20Scene/japanese-room_2K_42d6555f-dde5-4c27-873f-2bdc57fcc945.exr', (tex)=>{
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  hdrTex = tex; hdrEnv = pmrem.fromEquirectangular(tex).texture; applyEnv('hdri');
+}, undefined, (err)=>{ console.error('HDRI load failed', err); });
+
+function applyEnv(mode){
+  envMode = mode;
+  scene.environment = mode==='hdri' ? hdrEnv : mode==='warm' ? warmEnv : null;
+  rebakeProbe();
+}
+function rebakeProbe(){
+  const p = window._trayProbe; if(!p) return;
+  const v = p.tray.visible; p.tray.visible = false;
+  p.cubeCam.update(renderer, scene);
+  p.tray.visible = v;
+}
+
+// ---- LIGHTS (baked) ----
+const spot = new THREE.SpotLight(0xffda95, 6, 5.3527, 0.87, 0.6, 2);
+spot.castShadow = true;
+spot.shadow.mapSize.set(4096,4096); spot.shadow.bias=-0.0004; spot.shadow.normalBias=0.02; spot.shadow.focus=1;
+scene.add(spot); scene.add(spot.target);
+const shojiArea = new THREE.RectAreaLight(0xffdca8, 0, 1, 1); scene.add(shojiArea);
+const museum = new THREE.SpotLight(0xfff4e2, 2, 1.6, 0.28, 0.4, 2);
+museum.castShadow = true;
+museum.shadow.mapSize.set(2048,2048); museum.shadow.bias=-0.0004; museum.shadow.normalBias=0.02; museum.shadow.focus=1;
+scene.add(museum); scene.add(museum.target);
+
+const controls = new OrbitControls(camera, cv);
+controls.enableDamping = true;
+const maxAniso = renderer.capabilities.getMaxAnisotropy();
+
+// ===== MASK BLUR PIPELINE =====
+// bottle silhouette stays sharp; everything else gets a gaussian blur (depth-independent fake DOF).
+let blurOn = true, blurSpread = 1, featherSpread = 1; // BAKED
+const maskMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+let sharpRT, maskRT, maskTmp, maskFeather, blurA, blurB;
+function allocTargets(){
+  sharpRT     = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, samples: 4 });
+  maskRT      = new THREE.WebGLRenderTarget(W, H);
+  maskTmp     = new THREE.WebGLRenderTarget(W, H);
+  maskFeather = new THREE.WebGLRenderTarget(W, H);
+  const hw = Math.max(1, W>>1), hh = Math.max(1, H>>1);
+  blurA = new THREE.WebGLRenderTarget(hw, hh, { type: THREE.HalfFloatType, depthBuffer:false });
+  blurB = new THREE.WebGLRenderTarget(hw, hh, { type: THREE.HalfFloatType, depthBuffer:false });
+}
+allocTargets();
+
+const fsQuad = new FullScreenQuad();
+const blurMat = new THREE.ShaderMaterial({
+  uniforms: { tDiffuse:{value:null}, uDir:{value:new THREE.Vector2()}, uTexel:{value:new THREE.Vector2()} },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 uDir; uniform vec2 uTexel; varying vec2 vUv;
+    void main(){
+      vec2 o = uDir * uTexel;
+      vec4 c  = texture2D(tDiffuse, vUv) * 0.227027;
+      c += texture2D(tDiffuse, vUv + o*1.3846) * 0.316216;
+      c += texture2D(tDiffuse, vUv - o*1.3846) * 0.316216;
+      c += texture2D(tDiffuse, vUv + o*3.2308) * 0.070270;
+      c += texture2D(tDiffuse, vUv - o*3.2308) * 0.070270;
+      gl_FragColor = c;
+    }`
+});
+function doBlur(srcTex, dstRT, dx, dy){
+  blurMat.uniforms.tDiffuse.value = srcTex;
+  blurMat.uniforms.uDir.value.set(dx, dy);
+  blurMat.uniforms.uTexel.value.set(1/dstRT.width, 1/dstRT.height);
+  renderer.setRenderTarget(dstRT); fsQuad.material = blurMat; fsQuad.render(renderer);
+}
+
+// composite (linear) → OutputPass tonemaps. tDiffuse unused but required by ShaderPass.
+const composer = new EffectComposer(renderer);
+const CompositeShader = {
+  uniforms: { tDiffuse:{value:null}, tSharp:{value:null}, tBlur:{value:null}, tMask:{value:null}, uEnabled:{value:1} },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tSharp, tBlur, tMask; uniform float uEnabled; varying vec2 vUv;
+    void main(){
+      vec3 sharp = texture2D(tSharp, vUv).rgb;
+      if(uEnabled < 0.5){ gl_FragColor = vec4(sharp, 1.0); return; }
+      vec3 blur = texture2D(tBlur, vUv).rgb;
+      float m = texture2D(tMask, vUv).r;
+      gl_FragColor = vec4(mix(blur, sharp, m), 1.0);
+    }`
+};
+const compositePass = new ShaderPass(CompositeShader);
+composer.addPass(compositePass);
+composer.addPass(new OutputPass());
+
+function renderMaskBlur(){
+  camera.layers.set(0);
+  renderer.setRenderTarget(sharpRT);
+  renderer.render(scene, camera);              // sharp scene (transmission intact), linear
+  if(!blurOn) return;
+  // bottle silhouette → mask
+  const pBg = scene.background, pOv = scene.overrideMaterial;
+  scene.background = null; scene.overrideMaterial = maskMat;
+  camera.layers.set(MASK_LAYER);
+  renderer.setRenderTarget(maskRT); renderer.clear(); renderer.render(scene, camera);
+  scene.overrideMaterial = pOv; scene.background = pBg; camera.layers.set(0);
+  // feather the mask edge
+  doBlur(maskRT.texture,  maskTmp,     featherSpread, 0);
+  doBlur(maskTmp.texture, maskFeather, 0, featherSpread);
+  // blur the scene (half-res, 2 iterations)
+  doBlur(sharpRT.texture, blurA, blurSpread, 0);
+  doBlur(blurA.texture,   blurB, 0, blurSpread);
+  doBlur(blurB.texture,   blurA, blurSpread, 0);
+  doBlur(blurA.texture,   blurB, 0, blurSpread);
+}
+
+new GLTFLoader().load('Tokonama%20Scene/shinobu_tokonoma.glb', (gltf)=>{
+  const obj = gltf.scene;
+  scene.add(obj);
+
+  let shoji = null, tray = null;
+  obj.traverse(o=>{
+    if(!o.isMesh || !o.material) return;
+    const mat = o.material, mname = (mat.name||'') + ' ' + (o.name||'');
+    for(const k of ['map','normalMap','roughnessMap','metalnessMap','emissiveMap'])
+      if(mat[k]) mat[k].anisotropy = maxAniso;
+    const isGlass = mat.transmission > 0 || /glass/i.test(mname);
+    const isPaper = /shoji.?paper|shojipaper/i.test(mname);
+    o.receiveShadow = true;
+    o.castShadow = !isGlass && !isPaper;
+    if(isPaper) shoji = o;
+    if(/tray/i.test(mname)) tray = o;
+    if(isGlass || /3dmodel/i.test(mname)) o.layers.enable(MASK_LAYER); // the sharp HERO (bottle + glass)
+  });
+
+  scene.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(obj);
+  const c = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const r = size.length() * 0.5 || 1;
+
+  // BAKED starting camera
+  camera.position.set(-0.1511, 0.1003, 0.3049);
+  controls.target.set(0.0561, 0.1369, -0.0639);
+  camera.fov = 40;
+  camera.near = Math.max(r/100, 0.01); camera.far = r*30; camera.updateProjectionMatrix();
+  controls.minDistance = r*0.05; controls.maxDistance = r*8;
+  controls.update();
+  window._home = camera.position.clone();
+  window._homeTarget = controls.target.clone();
+
+  // CONSTRAINTS: lock zoom + pan; orbit ±45° (az + polar) from the FRONT view; floor cap on down-orbit
+  controls.enableZoom = false; controls.enablePan = false;
+  const LIM = Math.PI/4;
+  const frontSph = new THREE.Spherical().setFromVector3(new THREE.Vector3(0.0435, 0.1458, 0.3604).sub(controls.target));
+  const lowSph   = new THREE.Spherical().setFromVector3(new THREE.Vector3(-0.2387, 0.0096, 0.2139).sub(controls.target));
+  controls.minAzimuthAngle = frontSph.theta - LIM;
+  controls.maxAzimuthAngle = frontSph.theta + LIM;
+  controls.minPolarAngle = Math.max(0.01, frontSph.phi - LIM);
+  controls.maxPolarAngle = lowSph.phi;
+  controls.update();
+
+  if(shoji){
+    const sb = new THREE.Box3().setFromObject(shoji);
+    const sc = sb.getCenter(new THREE.Vector3()), ss = sb.getSize(new THREE.Vector3());
+    shojiArea.width = (Math.max(ss.x, ss.z)||r*0.5)*1.05; shojiArea.height = (ss.y||r*0.6)*1.05;
+    shojiArea.position.copy(sc).lerp(c, 0.03); shojiArea.lookAt(c);
+  }
+
+  // shoji spot — BAKED
+  spot.position.set(0.777, 0.6579, -0.0239);
+  spot.target.position.set(0.0134, 0.1496, -0.2895);
+  spot.intensity = 6; spot.angle = 0.87; spot.penumbra = 0.6; spot.decay = 2;
+  spot.distance = 5.3527; spot.color.set('#ffda95'); spot.shadow.bias = -0.0004;
+  spot.shadow.camera.near = r*0.05; spot.shadow.camera.far = Math.max(r*8, 7);
+  spot.shadow.camera.updateProjectionMatrix();
+
+  // museum downlight — BAKED
+  museum.position.set(0.032, 0.6984, 0.5935);
+  museum.target.position.set(0.0372, 0.2341, -0.0359);
+  museum.intensity = 2; museum.angle = 0.28; museum.penumbra = 0.4; museum.decay = 2;
+  museum.distance = 1.6; museum.color.set('#fff4e2');
+  museum.shadow.camera.near = r*0.05; museum.shadow.camera.far = Math.max(r*8, 7);
+  museum.shadow.camera.updateProjectionMatrix();
+
+  if(tray){
+    const tb = new THREE.Box3().setFromObject(tray);
+    const cubeRT = new THREE.WebGLCubeRenderTarget(512, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+    const cubeCam = new THREE.CubeCamera(0.01, r*50, cubeRT);
+    cubeCam.position.set((tb.min.x+tb.max.x)/2, tb.max.y + (tb.max.y-tb.min.y)*0.15, (tb.min.z+tb.max.z)/2);
+    window._trayProbe = { cubeCam, cubeRT, tray };
+    tray.material.envMap = cubeRT.texture; tray.material.envMapIntensity = 1.0; tray.material.needsUpdate = true;
+    rebakeProbe();
+  }
+
+  statusEl.innerHTML = 'bbox span (' + size.x.toFixed(2)+', '+size.y.toFixed(2)+', '+size.z.toFixed(2)+')' +
+    '<br>mask blur on bottle · <b>D</b> toggle<br>exposure ' + exposure.toFixed(2);
+  loader.classList.add('hide');
+}, (e)=>{ if(e.total) loader.textContent = 'loading… ' + Math.round(e.loaded/e.total*100) + '%'; },
+   (err)=>{ loader.textContent = 'FAILED: ' + err; console.error(err); });
+
+function logCamera(){
+  console.log('=== CAMERA ===\n' + JSON.stringify({
+    position: camera.position.toArray().map(n=>+n.toFixed(4)),
+    target: controls.target.toArray().map(n=>+n.toFixed(4)),
+    fov: camera.fov
+  }, null, 2));
+}
+
+addEventListener('keydown', (e)=>{
+  const k = e.key.toLowerCase();
+  if(k==='c'){ logCamera(); }
+  else if(k==='d'){ blurOn=!blurOn; }
+  else if(k==='r' && window._home){ camera.position.copy(window._home); controls.target.copy(window._homeTarget); controls.update(); }
+  else if(e.key==='['){ exposure=Math.max(0.1,exposure-0.05); renderer.toneMappingExposure=exposure; }
+  else if(e.key===']'){ exposure=Math.min(3,exposure+0.05); renderer.toneMappingExposure=exposure; }
+  else if(k==='e'){ const m = hdrEnv ? ['hdri','warm','off'] : ['warm','off']; applyEnv(m[(m.indexOf(envMode)+1)%m.length]); }
+  else if(k==='b'){ bgHdr=!bgHdr; scene.background = (bgHdr&&hdrTex)?hdrTex:new THREE.Color(0x100b07); }
+});
+
+addEventListener('resize', ()=>{
+  W=innerWidth;H=innerHeight; renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix();
+  [sharpRT,maskRT,maskTmp,maskFeather,blurA,blurB].forEach(t=>t.dispose());
+  allocTargets(); composer.setSize(W,H);
+});
+
+(function loop(){
+  controls.update();
+  renderMaskBlur();
+  compositePass.uniforms.tSharp.value   = sharpRT.texture;
+  compositePass.uniforms.tBlur.value    = blurB.texture;
+  compositePass.uniforms.tMask.value    = maskFeather.texture;
+  compositePass.uniforms.uEnabled.value = blurOn ? 1 : 0;
+  composer.render();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
