@@ -106,27 +106,36 @@ Proven live in a standalone test rig (since removed — clean tree). Findings:
 env 1.1`; exposure 0.95; light floor `1 - 0.6*formed`; camera FOV 38, pos `(0,-0.06,1.15)`;
 `wrap.rotation.x = -Math.PI/2*0.15` (the lean — leave it); scale `0.62/maxDim`.
 
-## 🚧 Tokonoma "scene materialize" page — WIP (NOT live; hero index.html untouched)
+## Tokonoma "scene materialize" page — LIVE on DESKTOP (device-split; mobile = hero)
 A second, richer landing: the Shinobu bottle materializes from dust **inside a tokonoma alcove** (tray,
 shoji, hanging scroll, plaster walls). Built in **`index_scene.html`**; runs **three 0.169** (not 0.160 —
 needs `environmentRotation`/`environmentIntensity`). Reference rig: **`tokonoma_view.html`** (scene-only,
 all lights/camera/DOF dialed there first, then ported). Assets in **`Tokonama Scene/`**
-(`shinobu_tokonoma.glb` 26MB single transmission glass, `japanese-room_2K_*.exr` HDRI).
+(`shinobu_tokonoma.glb` 26MB, `japanese-room_2K_*.exr` HDRI).
 
+- **DEVICE SPLIT (live):** a tiny redirect at the top of each page's `<head>` (before three.js loads) —
+  **desktop** → `index_scene.html` (this scene); **mobile** → `index.html` (the proven hero). `?stay`
+  overrides either way. So phones **never load the scene** — phone-tested it was too heavy (it's
+  desktop-class), so we split rather than cripple it. The `isMobile` tier still inside `index_scene` is
+  now vestigial (mobile redirects away before it runs).
 - **Done:** dust→bottle coalesce (samples bottle only), **set fades in at the form tail**; bloom on the
-  dust embers (now spec-matched to index2); constrained **±45° orbit** (locked zoom/pan, baked
-  start cam); **mask-blur DOF** (bottle stays sharp via a silhouette mask, set goes soft — depth-independent,
-  because bottle≈background distance is tiny); **real transmission** glass; baked lights (shoji `SpotLight`
-  casting the lattice grid + a museum down-`SpotLight`, env at intensity 0); brand + hint + **AR button**
-  (same bottle-only `shinobu_2k_ar.*`). Desktop full quality, **mobile tier gated by `isMobile`** (½ shadow,
-  ½ transmission res, 1 blur pass, no MSAA, 16k pts).
-- **NOT done:** real **phone test** (mobile tier coded, unverified); not swapped into the live hero.
+  dust embers (spec-matched to index2); constrained **±45° orbit** (locked zoom/pan, baked start cam);
+  **mask-blur DOF** (bottle sharp via a silhouette mask, set soft — depth-independent, bottle≈bg distance
+  is tiny); **FAKE glass** (real transmission dropped — see lesson); baked lights (shoji `SpotLight`
+  casting the lattice grid + a museum down-`SpotLight`, env intensity 0); brand + hint + **AR button**
+  (bottle-only `shinobu_2k_ar.*`).
+- **Backlog / ideas:** branches-behind-the-shoji with a swaying gobo (discussed — adds life; do it on the
+  shoji spot via `SpotLight.map`); if you ever want the scene on mobile, the cheap cuts in order are: fake
+  glass (done) → drop DOF → one shadow light → decimate the 142k bottle.
 - **LESSONS (load-bearing):**
   - **First-form stutter = parallel shader compile.** `renderer.compile()`+render does NOT block with
     `KHR_parallel_shader_compile`; the link finalizes on first real use → hitch. Fix = **`await
     renderer.compileAsync(scene,camera)`** in the warm-up (cover formed + dust states). This was THE fix.
-  - **Real transmission re-renders the whole scene per frame** (the cost the hero faked away). Half-res on
-    mobile via `renderer.transmissionResolutionScale`.
+  - **Real transmission re-renders the whole scene per frame** — and on a *thin* glass with env at 0 it
+    looks **identical to the fake** (nothing bright to refract/reflect). So we **dropped it** for the hero's
+    fake-alpha recipe (`index_scene` ~line 289), giving the glass its OWN HDRI envMap so it still reads
+    glassy despite the dark scene env. One fewer full-scene render, same look. (The "opaque black" glass
+    look is a *reflection/lighting* issue — env at 0 — not a transmission one.)
   - **Don't put a reflection probe on the lacquer tray** — it mirrored the bright plaster walls and washed
     the dark wood uniformly pale. Removed → natural `DarkWood`+clearcoat. (And a *smooth* env on a clearcoat
     reads as a uniform pale film; keep the transient env dark — see `makeDarkEnv`.)
