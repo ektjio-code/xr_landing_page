@@ -107,6 +107,7 @@ scene.environmentIntensity = 0;
 new EXRLoader().load('Tokonama%20Scene/japanese-room_2K_42d6555f-dde5-4c27-873f-2bdc57fcc945.exr', (tex)=>{
   tex.mapping = THREE.EquirectangularReflectionMapping;
   hdrTex = tex; hdrEnv = pmrem.fromEquirectangular(tex).texture; applyEnv('hdri');
+  glassMats.forEach(m=>{ m.envMap = hdrEnv; m.needsUpdate = true; }); // fake glass reflects the room
 }, undefined, (err)=>{ console.error('HDRI load failed', err); });
 
 function applyEnv(mode){
@@ -242,11 +243,12 @@ function makeDot(){
 }
 const dotTex = makeDot();
 const COUNT = isMobile ? 16000 : 36000;
-let bottleMeshes=[], setMeshes=[], points=null, pointGeo=null, homePos=null, scatterPos=null, modelReady=false, probeBaked=false, dustPivot=null;
+let bottleMeshes=[], setMeshes=[], glassMats=[], points=null, pointGeo=null, homePos=null, scatterPos=null, modelReady=false, probeBaked=false, dustPivot=null;
 let targetF=0, curF=0, lastFormF=-1;
 const trackEl = document.getElementById('track');
 function scrollProgress(){ const sc=trackEl.offsetHeight-innerHeight; return sc>0?clamp(scrollY/sc):0; }
 function setOpacity(m,a){
+  if(m.userData.isGlass){ m.visible = a > 0.001; return; } // fake glass: show/hide only, keep its alpha (don't go opaque at full form)
   const mats=Array.isArray(m.material)?m.material:[m.material];
   for(const mat of mats){ const o=mat.userData._op ?? 1; mat.opacity=o*a; mat.transparent = a<0.999; }
   m.visible = a>0.001;
@@ -283,6 +285,18 @@ new GLTFLoader().load('Tokonama%20Scene/shinobu_tokonoma.glb', async (gltf)=>{
     const isPaper = /shoji.?paper|shojipaper/i.test(mname);
     o.receiveShadow = true;
     o.castShadow = !isGlass && !isPaper;
+    if(isGlass){
+      // FAKE glass (hero recipe) — drop real transmission (a full 2nd scene-render/frame). Black alpha +
+      // env reflections. Reflects the HDRI room via an explicit envMap so it reads glassy despite the
+      // scene's dark env (intensity 0). Materialize treats it as visibility-only (setOpacity).
+      o.userData.isGlass = true;
+      mat.transmission = 0; mat.color.setHex(0x000000);
+      mat.transparent = true; mat.opacity = 0.12;
+      mat.roughness = 0.04; mat.metalness = 0;
+      mat.envMap = warmEnv; mat.envMapIntensity = 1.3; // upgraded to the HDRI once it loads
+      mat.depthWrite = false; mat.needsUpdate = true;
+      glassMats.push(mat);
+    }
     if(isPaper) shoji = o;
     if(/tray/i.test(mname)) tray = o;
     if(isGlass || /3dmodel/i.test(mname)){ o.layers.enable(MASK_LAYER); bottleMeshes.push(o); } // the sharp HERO (bottle + glass)
@@ -403,7 +417,7 @@ new GLTFLoader().load('Tokonama%20Scene/shinobu_tokonoma.glb', async (gltf)=>{
   lastFormF = -1; setForm(0);
 
   loader.classList.add('hide');
-}, (e)=>{ if(e.total) loader.textContent = 'loading… ' + Math.round(e.loaded/e.total*100) + '%'; },
+}, (e)=>{ if(e.total) loader.textContent = 'loading… ' + Math.min(100, Math.round(e.loaded/e.total*100)) + '%'; },
    (err)=>{ loader.textContent = 'FAILED: ' + err; console.error(err); });
 
 function logCamera(){
