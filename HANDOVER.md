@@ -123,10 +123,16 @@ all lights/camera/DOF dialed there first, then ported). Assets in **`Tokonama Sc
   **mask-blur DOF** (bottle sharp via a silhouette mask, set soft — depth-independent, bottle≈bg distance
   is tiny); **FAKE glass** (real transmission dropped — see lesson); baked lights (shoji `SpotLight`
   casting the lattice grid + a museum down-`SpotLight`, env intensity 0); brand + hint + **AR button**
-  (bottle-only `shinobu_2k_ar.*`).
-- **Backlog / ideas:** branches-behind-the-shoji with a swaying gobo (discussed — adds life; do it on the
-  shoji spot via `SpotLight.map`); if you ever want the scene on mobile, the cheap cuts in order are: fake
-  glass (done) → drop DOF → one shadow light → decimate the 142k bottle.
+  (bottle-only `shinobu_2k_ar.*`); **ambient dust motes** drifting forever (the "static" fix).
+- **Why it felt "static" (the real insight):** the hero is never static because its pivot *always slowly
+  spins*. The tokonoma is a **fixed diorama + user-driven locked camera** → when idle, it's a frozen frame.
+  Fix = restore *perpetual idle motion*. Cheapest = **ambient dust** (~300 additive motes, random dir +
+  speed, slow drift+wrap, fade in at form). A slow living-camera drift would also work. **Godrays** (fake
+  SC-style additive cone) and **branch gobo** were prototyped/discussed and **pulled as overkill** — kept
+  as future tricks, not in the file.
+- **Backlog / ideas:** branches-behind-the-shoji swaying gobo (`SpotLight.map`) or a living-camera drift if
+  more life is ever wanted; if you ever want the scene on mobile, cheap cuts in order: fake glass (done) →
+  drop DOF → one shadow light → decimate the 142k bottle.
 - **LESSONS (load-bearing):**
   - **First-form stutter = parallel shader compile.** `renderer.compile()`+render does NOT block with
     `KHR_parallel_shader_compile`; the link finalizes on first real use → hitch. Fix = **`await
