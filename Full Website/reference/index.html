@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script>
+  /* Device split: DESKTOP → the tokonoma scene; MOBILE stays on this hero page. (?stay to override) */
+  if(!/[?&]stay/i.test(location.search) && !matchMedia('(pointer:coarse)').matches) location.replace('index_scene.html');
+</script>
+<title>XRZENO — Materialize</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --stage:#16130f;      /* warm near-black, not pure black, not blue */
+    --stage2:#241d16;
+    --ink:#f3ece1;        /* warm off-white */
+    --muted:#9a8c79;      /* warm grey */
+    --accent:#e8a05c;     /* warm amber — product-light, not neon */
+  }
+  body{background:var(--stage);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    overflow-x:hidden;}
+  #track{height:400vh;position:relative;}
+  #stage{position:sticky;top:0;height:100vh;width:100%;overflow:hidden;}
+  #gl{display:block;width:100%;height:100%;}
+  /* MOBILE (touch): no scrolling — a pinch drives the form. Single fixed viewport. */
+  @media (pointer:coarse){
+    #track{height:100vh;}        /* collapse the 400vh scroll track so the page can't scroll */
+    #stage{touch-action:none;}   /* capture pinch/drag; suppress native scroll + pinch-zoom */
+  }
+
+  /* CTA / AR button */
+  #ar{position:fixed;z-index:30;bottom:11%;left:50%;transform:translateX(-50%) translateY(12px);
+    opacity:0;transition:opacity .6s,transform .6s;pointer-events:none;}
+  #ar.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
+  #ar button{background:transparent;color:var(--ink);border:1px solid rgba(232,160,92,.55);
+    padding:15px 30px;border-radius:100px;font-size:15px;letter-spacing:.02em;cursor:pointer;
+    font-family:inherit;transition:background .3s,border-color .3s;backdrop-filter:blur(6px);}
+  #ar button:hover{background:rgba(232,160,92,.12);border-color:var(--accent);}
+
+  #hint{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:40;
+    color:var(--muted);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    animation:fade 2.6s infinite;transition:opacity .4s;}
+  @keyframes fade{0%,100%{opacity:.3}50%{opacity:.8}}
+
+  #loader{position:fixed;inset:0;z-index:60;background:var(--stage);display:flex;
+    align-items:center;justify-content:center;color:var(--muted);font-size:13px;
+    letter-spacing:.2em;text-transform:uppercase;transition:opacity .6s;}
+  #loader.gone{opacity:0;pointer-events:none;}
+
+  #brand{position:fixed;top:22px;left:8%;z-index:50;font-size:15px;letter-spacing:.28em;
+    font-weight:600;color:var(--ink);}
+
+  /* desktop "view on mobile" toast — matches the warm, restrained product-gallery look */
+  #toast{position:fixed;z-index:70;left:50%;bottom:20%;
+    transform:translateX(-50%) translateY(10px);
+    max-width:min(86vw,400px);padding:16px 22px;
+    background:rgba(36,29,22,.82);backdrop-filter:blur(10px);
+    border:1px solid rgba(232,160,92,.45);border-radius:16px;
+    box-shadow:0 14px 44px rgba(0,0,0,.5);
+    color:var(--ink);font-size:14px;line-height:1.45;text-align:center;
+    opacity:0;pointer-events:none;transition:opacity .35s ease,transform .35s ease;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast b{color:var(--accent);font-weight:600;letter-spacing:.02em;}
+  #toast .t-sub{display:block;margin-top:6px;color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+
+<div id="loader"></div>
+<div id="brand">XRZENO</div>
+
+<div id="track">
+  <div id="stage"><canvas id="gl"></canvas></div>
+</div>
+
+<div id="ar">
+  <button id="arBtn">View in your space</button>
+</div>
+
+<div id="hint">Scroll to materialize ↓</div>
+<div id="toast"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const cv = document.getElementById('gl');
+const track = document.getElementById('track');
+let W = innerWidth, H = innerHeight;
+const isMobile = matchMedia('(pointer:coarse)').matches; // mobile gets lighter settings (pixelRatio, COUNT)
+
+const renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile ? 1.5 : 2)); // cap DPR on phones — Retina is brutal
+renderer.setSize(W,H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x16130f); // warm charcoal stage + the dark base the bloom needs
+const camera = new THREE.PerspectiveCamera(38, W/H, 0.01, 100);
+camera.position.set(0, -0.06, 1.15); // cam slightly below center → item sits higher on the page
+
+// warm studio lighting — product-gallery, not neon. Faded down as the object forms so the
+// RoomEnvironment does most of the lighting on the finished product (see loop()).
+const KEY0=2.4, FILL0=0.5, RIM0=1.4, AMB0=1.2;
+const key = new THREE.DirectionalLight(0xfff0dd, KEY0); key.position.set(2,3,2); scene.add(key);
+const fill = new THREE.DirectionalLight(0xcfe0ff, FILL0); fill.position.set(-3,1,1); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffd9a8, RIM0); rim.position.set(0,1,-3); scene.add(rim);
+const amb = new THREE.AmbientLight(0x4a3f33, AMB0); scene.add(amb);
+
+// Environment for IBL + reflections: procedural RoomEnvironment (neutral — the museum HDRI read too warm).
+// Generated synchronously (no async load).
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+pmrem.dispose();
+
+// group we spin
+const pivot = new THREE.Group(); scene.add(pivot);
+
+// --- post-processing: real-time bloom so the dots read as EMITTED light, not flat pixels ---
+const composer = new EffectComposer(renderer);
+composer.renderTarget1.samples = isMobile ? 0 : 4; // 4x MSAA DESKTOP ONLY — multisampled HalfFloat targets are brutal on mobile bandwidth
+composer.renderTarget2.samples = isMobile ? 0 : 4;
+composer.addPass(new RenderPass(scene, camera));
+// (strength, radius, threshold) — only the bright dot cores bloom; the dark stage stays clean
+const bloom = new UnrealBloomPass(new THREE.Vector2(W,H), 0.85, 0.45, 0.2);
+composer.addPass(bloom);
+composer.addPass(new OutputPass()); // applies tone mapping + sRGB at the end (no double-encode)
+
+// soft round glow sprite for each point — kills the flat-square look, gives a luminous core
+function makeDotSprite(){
+  const s=64, c=document.createElement('canvas'); c.width=c.height=s;
+  const x=c.getContext('2d'), g=x.createRadialGradient(s/2,s/2,0, s/2,s/2,s/2);
+  g.addColorStop(0.0,'rgba(255,255,255,1)');
+  g.addColorStop(0.35,'rgba(255,255,255,0.55)');
+  g.addColorStop(1.0,'rgba(255,255,255,0)');
+  x.fillStyle=g; x.fillRect(0,0,s,s);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+const dotTex = makeDotSprite();
+
+let meshes=[], points=null, pointGeo=null;
+let homePos=null, scatterPos=null, COUNT = isMobile ? 16000 : 36000;
+
+// Reveal once the model is ready (env is synchronous → envReady starts true). First compile the
+// FORMED-state pipeline off-screen via the composer (both bloom states) so the very first materialize
+// doesn't hitch on a live shader compile.
+let modelReady=false, envReady=true, warmedUp=false;
+function warmupReveal(){
+  if(warmedUp || !modelReady || !envReady) return;
+  warmedUp = true;
+  meshes.forEach(m=>{ m.visible = true; if(!m.userData.isGlass) m.material.opacity=1; });
+  const pv = points ? points.visible : false;
+  if(points) points.visible = true;
+  const savedRTS = composer.renderToScreen;
+  composer.renderToScreen = false;
+  bloom.enabled = true;  composer.render();
+  bloom.enabled = false; composer.render();
+  composer.renderToScreen = savedRTS;
+  meshes.forEach(m=>{ m.visible = false; if(!m.userData.isGlass) m.material.opacity=0; });
+  if(points) points.visible = pv;
+  document.getElementById('loader').classList.add('gone');
+}
+
+const loader = new GLTFLoader();
+loader.load('shinobu.glb', (gltf)=>{
+  const obj = gltf.scene;
+  // Shinobu has multiple meshes/materials — collect them ALL (not just the last one)
+  meshes = [];
+  obj.traverse(o=>{ if(o.isMesh) meshes.push(o); });
+
+  // center + scale to fit the stage nicely
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x,size.y,size.z);
+  const s = 0.62 / maxDim;
+  obj.position.sub(center);
+  obj.scale.setScalar(s);
+  // re-center after scale via wrapper
+  const wrap = new THREE.Group(); wrap.add(obj);
+  // Shinobu is modeled upright along Y. Slight up-tilt so the face aims up a touch.
+  // Adjust the degrees to taste (more negative = looks further up; flip the sign if it tilts the wrong way).
+  wrap.rotation.x = -Math.PI/2 * 0.15; // original lean — tilts the face up (off-axis front catches reflections)
+  pivot.add(wrap);
+
+  // prep materials: glass is FAKED with a black alpha material (three.js physical transmission renders
+  // as a white slab in this pipeline); non-glass fades via opacity. Anisotropy sharpens textures.
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  meshes.forEach(m=>{
+    const mat = m.material;
+    // anisotropic filtering — sharpens textures at grazing angles. DESKTOP ONLY (PC), like MSAA.
+    if(!isMobile) for(const map of [mat.map, mat.roughnessMap, mat.metalnessMap, mat.normalMap]) if(map) map.anisotropy = maxAniso;
+    if(mat.transmission > 0){
+      // GLASS: three.js physical transmission renders as a white slab in this pipeline, so use a
+      // simple alpha-blended clear glass instead — reliably shows the label behind it with a sheen.
+      m.userData.isGlass = true;
+      mat.transmission = 0;
+      mat.color.setHex(0x000000);  // BLACK base → no milky white veil; only reflections read as glass
+      mat.transparent = true;
+      mat.opacity = 0.12;          // subtle: keeps the label clear, just darkens slightly
+      mat.roughness = 0.04;
+      mat.metalness = 0;
+      mat.envMapIntensity = 1.1;   // glassy reflection highlights (tuned for RoomEnvironment) — the WORKING recipe
+      mat.depthWrite = false;      // don't occlude the label behind it
+      mat.needsUpdate = true;
+    } else {
+      // NON-GLASS: keep the reflections for metal / clearcoat, fade via opacity.
+      if('envMapIntensity' in mat) mat.envMapIntensity = 1.3;
+      mat.transparent = true; mat.opacity = 0;
+    }
+  });
+
+
+  // --- sample points off the surface of ALL meshes ---
+  scene.updateMatrixWorld(true); // world matrices must reflect wrap/scale/rotation before sampling
+  homePos = new Float32Array(COUNT*3);
+  scatterPos = new Float32Array(COUNT*3);
+  const colors = new Float32Array(COUNT*3);
+  const tmpP = new THREE.Vector3();
+
+  // split COUNT across meshes by vertex count so every part gets point coverage
+  const vcount = meshes.map(m=>m.geometry.attributes.position.count);
+  const totalV = vcount.reduce((a,b)=>a+b,0) || 1;
+  let idx = 0;
+  meshes.forEach((m,mi)=>{
+    const n = Math.max(0, mi===meshes.length-1 ? COUNT-idx : Math.round(COUNT*vcount[mi]/totalV));
+    const sampler = new MeshSurfaceSampler(m).build();
+    for(let k=0;k<n && idx<COUNT;k++,idx++){
+      sampler.sample(tmpP);              // position only (null normal/color args crash the sampler)
+      tmpP.applyMatrix4(m.matrixWorld);  // sample → world, then into pivot-local space
+      pivot.worldToLocal(tmpP);
+      homePos[idx*3]=tmpP.x; homePos[idx*3+1]=tmpP.y; homePos[idx*3+2]=tmpP.z;
+      // scatter start: exploded sphere shell around the object
+      const dir = new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize();
+      const r = 0.7 + Math.random()*1.1;
+      scatterPos[idx*3]=dir.x*r; scatterPos[idx*3+1]=dir.y*r; scatterPos[idx*3+2]=dir.z*r;
+      // uniform warm tint
+      colors[idx*3]=0.92; colors[idx*3+1]=0.74; colors[idx*3+2]=0.52;
+    }
+  });
+
+  pointGeo = new THREE.BufferGeometry();
+  pointGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(scatterPos),3));
+  pointGeo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  const pMat = new THREE.PointsMaterial({
+    size:0.011, map:dotTex, vertexColors:true, transparent:true, opacity:0.9,
+    depthWrite:false, depthTest:true, blending:THREE.AdditiveBlending, sizeAttenuation:true
+  });
+  points = new THREE.Points(pointGeo, pMat);
+  pivot.add(points);
+
+  document.getElementById('arBtn').addEventListener('click', launchAR);
+  modelReady = true;
+  warmupReveal(); // pre-compiles the formed pipeline off-screen, then reveals
+}, undefined, (err)=>{
+  document.getElementById('loader').textContent = 'Could not load asset';
+  console.error(err);
+});
+
+// ---- "View in your space" → launch NATIVE AR directly (no web 3D viewer) ----
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS reports as Mac
+const isAndroid = /android/i.test(navigator.userAgent);
+// absolute directory URL of this page, so the asset URLs are fully-qualified for the AR launchers
+const baseURL = location.href.split(/[?#]/)[0].replace(/[^/]*$/, '');
+
+let toastTimer=null;
+function showToast(html){
+  const t=document.getElementById('toast');
+  t.innerHTML=html;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'), 4200);
+}
+
+function launchAR(){
+  if(isIOS){
+    // iOS AR Quick Look — opens straight into native AR with the USDZ. rel="ar" requires
+    // the anchor to contain exactly one <img> child, then a programmatic click fires it.
+    const a = document.createElement('a');
+    a.setAttribute('rel', 'ar');
+    a.appendChild(document.createElement('img'));
+    a.href = baseURL + 'shinobu_2k_ar.usdz';
+    a.click();
+  } else if(isAndroid){
+    // Android Scene Viewer — mode=ar_only goes straight to the camera, skipping the 3D preview.
+    const glb = encodeURIComponent(baseURL + 'shinobu_2k_ar.glb');
+    const fallback = encodeURIComponent(location.href);
+    window.location.href =
+      'intent://arvr.google.com/scene-viewer/1.0?file=' + glb +
+      '&mode=ar_only&title=' + encodeURIComponent('XRZENO — Shinobu') +
+      '#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;' +
+      'S.browser_fallback_url=' + fallback + ';end;';
+  } else {
+    // Desktop / unsupported — AR needs a phone; show the on-brand toast.
+    showToast('<b>View on mobile for AR</b><span class="t-sub">Open this page on your iOS or Android phone to place it in your space.</span>');
+  }
+}
+
+// ---- scroll → form amount ----
+let targetF=0, curF=0;
+function scrollProgress(){
+  const sc = track.offsetHeight - innerHeight;
+  const y = Math.min(Math.max(scrollY,0),sc);
+  return sc>0 ? y/sc : 0;
+}
+function easeInOut(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
+
+if(isMobile) document.getElementById('hint').textContent = 'Pinch to materialize';
+
+// ---- desktop: drag to spin (mobile 1-finger rotate is handled in the touch block below) ----
+let dragging=false, lastX=0, spinVel=0, userSpin=0;
+if(!isMobile){
+  cv.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;});
+  addEventListener('pointerup',()=>dragging=false);
+  addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lastX; lastX=e.clientX;
+    userSpin += dx*0.005; spinVel = dx*0.005;
+  });
+}
+
+// ---- mobile gestures: 1 finger = rotate, 2 fingers = pinch (squeeze form / spread disperse) ----
+if(isMobile){
+  let pinchDist = null, lastX = 0;
+  const touchDist = t => Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
+  cv.addEventListener('touchstart', e=>{
+    if(e.touches.length===1){ dragging=true; lastX=e.touches[0].clientX; }   // rotate
+    else if(e.touches.length===2){ dragging=false; pinchDist=touchDist(e.touches); } // pinch
+  }, {passive:true});
+  cv.addEventListener('touchmove', e=>{
+    if(e.touches.length===2){
+      e.preventDefault();                              // block native pinch-zoom
+      const d = touchDist(e.touches);
+      if(pinchDist!==null){
+        const delta = d - pinchDist;                   // >0 = spread, <0 = squeeze
+        // squeeze gathers (targetF→1), spread disperses (targetF→0); span-relative = device-independent
+        targetF = Math.max(0, Math.min(1, targetF - delta/(H*0.6)));
+      }
+      pinchDist = d;
+    } else if(e.touches.length===1 && dragging){
+      e.preventDefault();
+      const dx = e.touches[0].clientX - lastX; lastX = e.touches[0].clientX;
+      userSpin += dx*0.005; spinVel = dx*0.005;        // same feel as desktop drag (+ inertia in loop)
+    }
+  }, {passive:false});
+  cv.addEventListener('touchend', e=>{
+    if(e.touches.length<2) pinchDist = null;
+    if(e.touches.length===0) dragging=false;                                  // released → inertia
+    else if(e.touches.length===1){ dragging=true; lastX=e.touches[0].clientX; } // 2→1: resume rotate, no jump
+  });
+}
+
+let lastFormF = -1;
+function setForm(f){
+  if(!points||!pointGeo) return;
+  // Only rewrite + re-upload the point buffer when the form amount actually changed — it used to run
+  // every frame forever (even idle/formed) = constant CPU + GPU upload = mobile heat.
+  if(f !== lastFormF){
+    lastFormF = f;
+    const pos = pointGeo.attributes.position.array;
+    const fly = Math.min(1, f/0.7); // points fly home over first 70%
+    const e = easeInOut(fly);
+    for(let i=0;i<COUNT;i++){
+      const j=i*3;
+      pos[j]  = scatterPos[j]  + (homePos[j]  - scatterPos[j])*e;
+      pos[j+1]= scatterPos[j+1]+ (homePos[j+1]- scatterPos[j+1])*e;
+      pos[j+2]= scatterPos[j+2]+ (homePos[j+2]- scatterPos[j+2])*e;
+    }
+    pointGeo.attributes.position.needsUpdate = true;
+  }
+
+  // mesh fades in over last 45%; points fade FULLY out so the finished figure has ZERO dots
+  const meshIn = Math.max(0, Math.min(1,(f-0.55)/0.45));
+  // fade meshes in; keep hidden until forming starts. Non-glass goes OPAQUE once formed so the
+  // transparent glass always sorts correctly over the label (left transparent, the glass can go black).
+  for(const m of meshes){
+    if(m.userData.isGlass){
+      m.visible = meshIn > 0;
+    } else {
+      m.material.opacity = meshIn;
+      m.material.transparent = meshIn < 1;           // opaque at full form so the glass sorts over it (toggle needs no recompile)
+      m.visible = meshIn > 0;
+    }
+  }
+  points.material.opacity = 0.9 * (1 - meshIn);
+  points.visible = meshIn < 1; // hard-hide once fully formed — no stray dots on or around the mesh
+}
+
+function loop(){
+  if(!isMobile) targetF = scrollProgress(); // desktop: scroll drives form. mobile: pinch sets targetF.
+  curF += (targetF-curF)*0.1;
+  if(Math.abs(targetF-curF)<0.0004) curF=targetF;
+  setForm(curF);
+
+  // as it forms, drop the dot-emission bloom and fade the studio lights down so the finished
+  // product is lit mainly by the environment.
+  const formed = Math.max(0, Math.min(1,(curF-0.55)/0.45));
+  bloom.strength = 0.85 * (1 - formed);
+  bloom.enabled = formed < 1; // skip the bloom passes once formed (glow's gone) → saves GPU
+  // keep a small studio-light floor at full form
+  const lit = 1 - 0.6*formed;
+  key.intensity=KEY0*lit; fill.intensity=FILL0*lit; rim.intensity=RIM0*lit; amb.intensity=AMB0*lit;
+
+  // gentle auto-rotate + user drag inertia
+  if(!dragging){ userSpin += spinVel; spinVel *= 0.94; }
+  pivot.rotation.y = curF*0.6 + userSpin + performance.now()*0.00006;
+
+  // UI
+  toggleEl(document.getElementById('ar'), curF>0.85);
+  document.getElementById('hint').style.opacity = curF>0.04?'0':'';
+
+  // Always render through the composer — glass is plain alpha (not transmission), so no need to bypass
+  // it, and NOT switching render paths avoids a full material recompile (that was the formation stutter).
+  composer.render();
+  requestAnimationFrame(loop);
+}
+function toggleEl(e,on){ if(e) e.classList.toggle('show',on);}
+
+addEventListener('resize',()=>{
+  W=innerWidth;H=innerHeight;
+  renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix();
+  composer.setSize(W,H);
+});
+loop();
+</script>
+</body>
+</html>
