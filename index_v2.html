@@ -19,7 +19,7 @@
   #gl{display:block;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1}
   #coolVeil{position:fixed;inset:0;z-index:2;opacity:0;pointer-events:none;mix-blend-mode:multiply;background:radial-gradient(120% 90% at 12% 8%, #6f8dff 0%, #2a49b8 34%, #0a1633 68%, #05070c 100%)} /* cold-light GEL (multiply, not a flat sheet): cools plaster toward blue + deepens darks, keeps scene contrast. Electric-blue corner glow per Monture ref */
   #track{position:relative;width:100%;height:700vh;z-index:0;pointer-events:none} /* 700vh: first half materialize, second half journey */
-  #release{position:relative;height:80vh;z-index:0;pointer-events:none} /* runway = the bodyP ramp length (0.8 screens) exactly, so the fade hits 100% right at the page bottom → no dead scroll tail before the site takes over */
+  #release{position:relative;height:90vh;z-index:0;pointer-events:none} /* runway = the bodyP ramp length (0.9 screens) exactly, so the fade hits 100% right at the page bottom → no dead scroll tail before the site takes over */
   #compare{border-top:none} /* first body section emerges from the void with no seam line */
   @media (pointer:coarse){ body{overflow:hidden} #track{height:100vh} }
   :root{ --ink:#f3ece1; --muted:#9a8c79; --accent:#e8a05c; }
@@ -831,7 +831,7 @@ arBtn.addEventListener('click', ()=> inspectMode ? exitInspect() : enterInspect(
 // ===== BODY SCROLL HANDOFF =====
 // Once the site has fully faded in, FREEZE the page scroll and let #siteBody own scrolling — one active scroll zone (no window-vs-body desync, no pointer-events gesture-eating).
 // Pull up at the very top of the site → pop back into the narrative, which resumes easing from ~0.9.
-const RAMP = ()=> innerHeight*0.8;                       // bodyP ramp length (must match the bodyP formula + the #release height)
+const RAMP = ()=> innerHeight*0.9;                       // bodyP ramp length (must match the bodyP formula + the #release height)
 let bodyLocked = false, pendingSection = null, rafPaused = false;
 function enterBodyLock(){ bodyLocked=true; document.documentElement.style.overflow='hidden'; document.body.style.overflow='hidden';
   const t = pendingSection && document.getElementById(pendingSection); pendingSection=null;
@@ -865,7 +865,7 @@ function loop(){
   if(!isMobile && !inspectMode) targetF = splitProgress();   // desktop scroll drives form; frozen while inspecting
   curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
   curJ += (journeyP-curJ)*0.1; if(Math.abs(journeyP-curJ)<0.0004) curJ=journeyP;   // damped, but the pose is read from curJ → reversible
-  bodyP = clamp((scrollY - (trackEl.offsetHeight - innerHeight)) / (innerHeight*0.8));  // 0 through the narrative, eases to 1 across the runway (~0.8 screens)
+  bodyP = clamp((scrollY - (trackEl.offsetHeight - innerHeight)) / (innerHeight*0.9));  // 0 through the narrative, eases to 1 across the runway (~0.9 screens)
   if(!isMobile && !bodyLocked && bodyP>=0.99) enterBodyLock();   // fully faded in → hand scrolling to the site (freeze page scroll)
   if(bodyLocked) bodyP=1;                                        // stay pinned at full while the site owns the scroll
   setForm(curF);
