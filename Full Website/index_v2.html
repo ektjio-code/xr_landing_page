@@ -10,15 +10,33 @@
 <title>XRZENO — Scene</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+<script src="strings.js"></script>
 
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#0e0c0a;font-family:system-ui,sans-serif}
+  body{background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif} /* --bg is the void the canvas fades into AND the body's ground → seamless */
   #gl{display:block;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1}
+  #coolVeil{position:fixed;inset:0;z-index:2;opacity:0;pointer-events:none;mix-blend-mode:multiply;background:radial-gradient(120% 90% at 12% 8%, #6f8dff 0%, #2a49b8 34%, #0a1633 68%, #05070c 100%)} /* cold-light GEL (multiply, not a flat sheet): cools plaster toward blue + deepens darks, keeps scene contrast. Electric-blue corner glow per Monture ref */
   #track{position:relative;width:100%;height:700vh;z-index:0;pointer-events:none} /* 700vh: first half materialize, second half journey */
+  #release{position:relative;height:80vh;z-index:0;pointer-events:none} /* runway = the bodyP ramp length (0.8 screens) exactly, so the fade hits 100% right at the page bottom → no dead scroll tail before the site takes over */
+  #compare{border-top:none} /* first body section emerges from the void with no seam line */
   @media (pointer:coarse){ body{overflow:hidden} #track{height:100vh} }
   :root{ --ink:#f3ece1; --muted:#9a8c79; --accent:#e8a05c; }
-  #brand{position:fixed;top:22px;left:24px;z-index:50;font-size:15px;letter-spacing:.28em;font-weight:600;color:var(--ink)}
+  /* ===== DRAWER: the corner XRZENO is the site's menu / escape hatch (replaces the old static #brand; z-index 100, above everything). Cold navy panel, warm-orange actionable accents to match the site buttons. ===== */
+  #drawerCtl{position:fixed;top:15px;left:18px;z-index:100;display:flex;align-items:center;gap:8px;background:none;border:0;cursor:pointer;color:#f0ece4;font-family:'Montserrat',system-ui,sans-serif;font-size:12px;letter-spacing:.26em;font-weight:700;padding:8px;transition:letter-spacing .25s}
+  #drawerCtl:hover{letter-spacing:.34em}
+  #drawerCtl .chev{display:inline-block;border:solid #ff8a3d;border-width:0 2px 2px 0;padding:3px;transform:rotate(45deg) translateY(-2px);transition:transform .25s}
+  #drawerCtl[aria-expanded="true"] .chev{transform:rotate(-135deg) translateY(-2px)}
+  #drawer{position:fixed;top:0;left:0;z-index:99;height:100vh;width:min(280px,84vw);background:rgba(18,34,82,.42);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-right:1px solid rgba(120,150,255,.28);padding:84px 30px 30px;display:flex;flex-direction:column;gap:4px;transform:translateX(-102%);transition:transform .35s cubic-bezier(.3,.9,.3,1)} /* frosted BLUE pane — glass like the buttons, blue-hued */
+  #drawer.open{transform:translateX(0)}
+  #drawer a{color:#eaf1ff;text-decoration:none;font-family:'Montserrat',system-ui,sans-serif;font-weight:700;font-size:16px;letter-spacing:.05em;padding:9px 0;border-bottom:1px solid rgba(150,180,255,.14);transition:color .2s}
+  #drawer a:hover{color:#ff8a3d}
+  #drawer .d-wa{margin-top:auto;background:#ff8a3d;color:#1a0e04;border:1px solid #ff8a3d;border-bottom:1px solid #ff8a3d;border-radius:100px;text-align:center;padding:13px;font-size:14px;transition:background .3s,color .3s} /* SAME as the bottom-of-page CTA (.btn-wa): solid warm pill */
+  #drawer .d-wa:hover{background:transparent;color:#ff8a3d}
+  #drawer .d-lang{font-size:12px;color:#93a4c7;letter-spacing:.14em;text-transform:uppercase;border-bottom:0}
+  #scrim{position:fixed;inset:0;z-index:98;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s}
+  #scrim.on{opacity:1;pointer-events:auto}
   #ar{position:fixed;z-index:30;bottom:9%;left:50%;transform:translateX(-50%) translateY(12px);opacity:0;transition:opacity .6s,transform .6s;pointer-events:none}
   #ar.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
   #ar button{background:transparent;color:var(--ink);border:1px solid rgba(232,160,92,.55);padding:15px 30px;border-radius:100px;font-size:15px;letter-spacing:.02em;cursor:pointer;font-family:inherit;transition:background .3s,border-color .3s;backdrop-filter:blur(6px)}
@@ -46,13 +64,81 @@
   .beat-final .d-brand span{display:block;background:linear-gradient(90deg,#ffffff 0%,#ffffff 30%,#101f3d 70%);-webkit-background-clip:text;background-clip:text;color:transparent}
   .beat-final .d-brand .d-sharp{position:absolute;top:0;left:0;width:100%}
   .beat-final .d-brand .d-blur{filter:blur(16px)}
+
+  /* ===== SITE BODY (concept skeleton — WARM placeholder tokens, colour TBD after Ed sees the handoff) ===== */
+  :root{ --bg:#16130f; --bg-deep:#0e0c0a; --navy:#101f3d; --hairline:rgba(243,236,225,.08);
+    --disp:'Montserrat',system-ui,sans-serif; --body:system-ui,-apple-system,sans-serif; }
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  #siteBody{position:fixed;inset:0;overflow-y:auto;overscroll-behavior:none;z-index:3;opacity:0;pointer-events:none;text-shadow:0 2px 18px rgba(0,0,0,.55);
+    /* MONTURE COLD PALETTE — scoped to the website only; narrative world (outside #siteBody) stays warm */
+    --ink:#eaf1ff; --muted:#93a4c7; --accent:#1e40ff; --warm:#ff8a3d; --bg-deep:#0a1633; --hairline:rgba(150,180,255,.14); --navy:#0a1633;}
+    /* teal/orange split (early-2000s poster): structure stays cold cobalt (--accent); buttons, button highlights + the compare line go WARM (--warm) */
+  .sect{position:relative;z-index:2;background:transparent;padding:clamp(72px,11vh,130px) 6vw;border-top:1px solid var(--hairline)}
+  .wrap{max-width:1060px;margin:0 auto}
+  .eyebrow{font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.34em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
+  h2{font-family:var(--disp);font-weight:800;font-size:clamp(1.9rem,4.4vw,3.2rem);letter-spacing:.01em;line-height:1.08;margin-bottom:20px}
+  .lede{color:var(--muted);max-width:56ch;margin-bottom:44px}
+  .cmp{position:relative;max-width:860px;margin:0 auto;aspect-ratio:16/10;overflow:hidden;border:1px solid var(--hairline);background:var(--bg-deep)}
+  .cmp .layer{position:absolute;inset:0;background-size:cover;background-position:center}
+  .ph-real{background-image:linear-gradient(115deg,#3a2c1d,#6b5238 55%,#281d13)}
+  .ph-render{background-image:linear-gradient(115deg,#101f3d,#2a3c60 55%,#0e1729)}
+  .cmp .top{clip-path:inset(0 calc(100% - var(--x,50%)) 0 0)}
+  .cmp .bar{position:absolute;top:0;bottom:0;left:var(--x,50%);width:2px;background:var(--warm);transform:translateX(-1px);pointer-events:none} /* warm divider — the poster-orange signature line */
+  .cmp .bar::after{content:'\25C2 \25B8';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-deep);border:1px solid var(--warm);border-radius:100px;color:var(--ink);font-size:12px;letter-spacing:2px;padding:8px 12px;white-space:nowrap}
+  .cmp input[type=range]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:ew-resize;-webkit-appearance:none;appearance:none;touch-action:pan-y}
+  .cmp .tag{position:absolute;bottom:14px;font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink);background:rgba(14,12,10,.6);padding:5px 12px;pointer-events:none}
+  .cmp .tag.l{left:14px} .cmp .tag.r{right:14px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
+  .card{background:var(--bg-deep);border:1px solid var(--hairline);padding:14px 14px 18px}
+  .card model-viewer{width:100%;aspect-ratio:1/1.05;background:radial-gradient(80% 90% at 50% 38%,#0f1c3a 0%,var(--bg-deep) 70%)}
+  .card h3{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.06em;margin:14px 4px 3px}
+  .card p{color:var(--muted);font-size:13.5px;margin:0 4px 14px}
+  .card .arb{display:inline-block;color:var(--ink);text-decoration:none;font-size:13.5px;border:1px solid rgba(200,215,255,.30);border-radius:100px;padding:9px 18px;margin:0 4px;background:rgba(255,255,255,.04);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:background .3s,border-color .3s} /* frosted-glass pill, like the "View 3D Model" button */
+  .card .arb:hover{background:rgba(200,215,255,.12);border-color:rgba(200,215,255,.55)}
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:34px;counter-reset:step}
+  .step{border-top:2px solid var(--accent);padding-top:18px;counter-increment:step}
+  .step h3{font-family:var(--disp);font-weight:800;font-size:1.25rem;letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px}
+  .step h3::before{content:counter(step,decimal-leading-zero)"  ";color:var(--accent);font-weight:700}
+  .step p{color:var(--muted);font-size:15px}
+  .note{margin-top:44px;color:var(--muted);font-size:14.5px;max-width:70ch;border-left:2px solid var(--hairline);padding-left:18px}
+  .faq details{border-bottom:1px solid var(--hairline)}
+  .faq summary{cursor:pointer;list-style:none;font-family:var(--disp);font-weight:700;font-size:1.02rem;letter-spacing:.02em;padding:20px 34px 20px 0;position:relative}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:'+';position:absolute;right:6px;color:var(--accent);font-weight:700;transition:transform .25s}
+  .faq details[open] summary::after{transform:rotate(45deg)}
+  .faq details p{color:var(--muted);padding:0 0 22px;max-width:66ch}
+  .cta{text-align:center}
+  .cta .lede{margin-left:auto;margin-right:auto}
+  .btnrow{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-block;text-decoration:none;font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.03em;border-radius:100px;padding:15px 32px;transition:background .3s,border-color .3s,color .3s}
+  .btn-wa{background:var(--warm);color:#1a0e04;border:1px solid var(--warm)}
+  .btn-wa:hover{background:transparent;color:var(--warm)}
+  .btn-mail{background:rgba(255,255,255,.04);color:var(--ink);border:1px solid rgba(200,215,255,.30);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)} /* frosted-glass pill, like the "View 3D Model" button */
+  .btn-mail:hover{background:rgba(200,215,255,.12);border-color:rgba(200,215,255,.55)}
+  footer{position:relative;z-index:2;background:transparent;border-top:1px solid var(--hairline);padding:34px 6vw;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
+  footer a{color:var(--muted);text-decoration:none} footer a:hover{color:var(--accent)}
+  footer .fb{font-family:var(--disp);font-weight:700;letter-spacing:.28em;color:var(--ink)}
 </style>
 </head>
 <body>
 <canvas id="gl"></canvas>
+<div id="coolVeil" aria-hidden="true"></div>
 <div id="track"></div>
+<div id="release" aria-hidden="true"></div>
 <div id="loader">loading scene…</div>
-<div id="brand">XRZENO</div>
+<!-- DRAWER (was the static #brand) — corner menu / escape hatch for the impatient visitor -->
+<button id="drawerCtl" aria-expanded="false" aria-controls="drawer">XRZENO <span class="chev" aria-hidden="true"></span></button>
+<div id="scrim"></div>
+<nav id="drawer" aria-label="Site navigation">
+  <a href="#portfolio" data-nav="portfolio" data-i18n="drawer.portfolio">Portfolio</a>
+  <a href="#process"   data-nav="process"   data-i18n="drawer.process">How it works</a>
+  <a href="#faq"       data-nav="faq"        data-i18n="drawer.faq">FAQ</a>
+  <a href="#contact"   data-nav="contact"    data-i18n="drawer.contact">Contact</a>
+  <a href="#" class="d-lang" id="langToggle" data-i18n="drawer.lang">Bahasa Indonesia</a>
+  <a href="#" class="d-wa" id="drawerWA" target="_blank" rel="noopener" data-i18n="drawer.whatsapp">Chat on WhatsApp</a>
+</nav>
 <div id="ar"><button id="arBtn">View 3D Model</button></div>
 <div id="hint">Scroll to materialize ↓</div>
 <div id="beatScrim" aria-hidden="true"></div>
@@ -65,6 +151,99 @@
   </div>
 </div>
 <div id="toast"></div>
+
+<!-- ===== SITE BODY (concept skeleton) — the fixed, blurred, cold scene is its background; content fades in over it ===== -->
+<div id="siteBody">
+<section class="sect" id="compare">
+  <div class="wrap">
+    <div class="eyebrow" data-i18n="compare.eyebrow">Real vs Render</div>
+    <h2 data-i18n="compare.title">One of these is a photograph.</h2>
+    <p class="lede" data-i18n="compare.body">Every model we deliver starts as the physical product on our scanner.</p>
+    <div class="cmp" id="cmp" style="--x:50%">
+      <div class="layer ph-render" aria-hidden="true"></div>
+      <div class="layer ph-real top" aria-hidden="true"></div>
+      <div class="bar" aria-hidden="true"></div>
+      <span class="tag l" data-i18n="compare.labelReal">Photo</span>
+      <span class="tag r" data-i18n="compare.labelRender">Render</span>
+      <input type="range" min="0" max="100" value="50" step="0.1" aria-label="Photo / render divider">
+    </div>
+  </div>
+</section>
+
+<section class="sect" id="portfolio">
+  <div class="wrap">
+    <div class="eyebrow" data-i18n="portfolio.eyebrow">Portfolio</div>
+    <h2 data-i18n="portfolio.title">Built from real products.</h2>
+    <p class="lede" data-i18n="portfolio.body">Drag to rotate. Open on your phone to place any of these in your space at true size.</p>
+    <div class="cards">
+      <div class="card">
+        <model-viewer src="shinobu_2k_ar.glb" ios-src="shinobu_2k_ar.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
+          exposure="0.9" shadow-intensity="1" interaction-prompt="none" alt="Shinobu whisky bottle"></model-viewer>
+        <h3>Shinobu — whisky bottle</h3>
+        <p>Photogrammetry · glass + label rebuild</p>
+        <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
+      </div>
+      <div class="card">
+        <model-viewer src="ASSET_2.glb" ios-src="ASSET_2.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
+          exposure="0.9" shadow-intensity="1" alt="Product 2"></model-viewer>
+        <h3>Asset 2 — title</h3>
+        <p>One-line craft note</p>
+        <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
+      </div>
+      <div class="card">
+        <model-viewer src="ASSET_3.glb" ios-src="ASSET_3.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
+          exposure="0.9" shadow-intensity="1" alt="Product 3"></model-viewer>
+        <h3>Asset 3 — title</h3>
+        <p>One-line craft note</p>
+        <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sect" id="process">
+  <div class="wrap">
+    <div class="eyebrow" data-i18n="process.eyebrow">How it works</div>
+    <h2 data-i18n="process.title">Scan. Rebuild. Deliver.</h2>
+    <div class="steps">
+      <div class="step"><h3 data-i18n="process.step1.title">Scan</h3><p data-i18n="process.step1.body"></p></div>
+      <div class="step"><h3 data-i18n="process.step2.title">Rebuild</h3><p data-i18n="process.step2.body"></p></div>
+      <div class="step"><h3 data-i18n="process.step3.title">Deliver</h3><p data-i18n="process.step3.body"></p></div>
+    </div>
+    <p class="note" data-i18n="process.note"></p>
+  </div>
+</section>
+
+<section class="sect" id="faq">
+  <div class="wrap faq">
+    <div class="eyebrow" data-i18n="faq.eyebrow">FAQ</div>
+    <h2 data-i18n="faq.title">Common questions</h2>
+    <details><summary data-i18n="faq.q1"></summary><p data-i18n="faq.a1"></p></details>
+    <details><summary data-i18n="faq.q2"></summary><p data-i18n="faq.a2"></p></details>
+    <details><summary data-i18n="faq.q3"></summary><p data-i18n="faq.a3"></p></details>
+    <details><summary data-i18n="faq.q4"></summary><p data-i18n="faq.a4"></p></details>
+    <details><summary data-i18n="faq.q5"></summary><p data-i18n="faq.a5"></p></details>
+    <details><summary data-i18n="faq.q6"></summary><p data-i18n="faq.a6"></p></details>
+  </div>
+</section>
+
+<section class="sect cta" id="contact">
+  <div class="wrap">
+    <h2 data-i18n="cta.title">Show your product, not a picture of it.</h2>
+    <p class="lede" data-i18n="cta.body">Tell us what you make.</p>
+    <div class="btnrow">
+      <a class="btn btn-wa" id="ctaWA" href="#" data-i18n="cta.whatsapp">Chat on WhatsApp</a>
+      <a class="btn btn-mail" href="mailto:hello@xrzeno.com" data-i18n="cta.email">Email us</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span class="fb">XRZENO</span>
+  <span data-i18n="footer.tagline">WebAR & product visualization</span>
+  <span><a href="/privacy" data-i18n="footer.privacy">Privacy</a> · <span data-i18n="footer.rights">© XRZENO</span></span>
+</footer>
+</div><!-- /#siteBody -->
 
 <script type="importmap">
 { "imports": {
@@ -158,6 +337,10 @@ const museum = new THREE.SpotLight(0xfff4e2, 2, 1.6, 0.28, 0.4, 2);
 museum.castShadow = true;
 museum.shadow.mapSize.setScalar(isMobile?1024:2048); museum.shadow.bias=-0.0004; museum.shadow.normalBias=0.02; museum.shadow.focus=1;
 scene.add(museum); scene.add(museum.target);
+
+// COLD-NIGHT RELIGHT: the finale actually re-lights the scene (warm baked spots → cold moonlight), NOT a veil over the top.
+const SPOT_WARM = new THREE.Color(0xffda95), SPOT_COLD = new THREE.Color(0x5f80e8); // shoji beam: honey → cold moonlight
+const MUS_WARM  = new THREE.Color(0xfff4e2), MUS_COLD  = new THREE.Color(0x86a4ff); // museum downlight: warm white → icy blue
 
 const controls = new OrbitControls(camera, cv);
 controls.enableDamping = true;
@@ -270,7 +453,7 @@ function makeDot(){
 const dotTex = makeDot();
 const COUNT = isMobile ? 16000 : 36000;
 let bottleMeshes=[], setMeshes=[], glassMats=[], bodyMeshes=[], glassMeshes=[], clayOverlays=[], points=null, pointGeo=null, homePos=null, scatterPos=null, modelReady=false, probeBaked=false, dustPivot=null;
-let targetF=0, curF=0, curJ=0, xrReveal=0, deliverFade=0, lastFormF=-1;   // curJ = rail scalar; xrReveal = slow XRZENO finale reveal; deliverFade = DELIVER auto-retire
+let targetF=0, curF=0, curJ=0, xrReveal=0, deliverFade=0, bodyP=0, lastFormF=-1;   // curJ rail scalar; xrReveal finale reveal; deliverFade DELIVER retire; bodyP canvas-release (0 narrative → 1 body)
 const trackEl = document.getElementById('track');
 function scrollProgress(){ const sc=trackEl.offsetHeight-innerHeight; return sc>0?clamp(scrollY/sc):0; }
 // ===== PROGRESS SPLIT: raw scroll 0..SPLIT drives the materialize, SPLIT..1 drives the journey =====
@@ -577,7 +760,8 @@ function launchAR(){
 const arBtn = document.getElementById('arBtn');   // desktop button repurposed as "View 3D Model" (inspect mode, below)
 
 // ---- Step 4: pinned pipeline beats (Scan / Rebuild / Deliver) — blur-in/out driven by curJ (reversible) ----
-const beatScan = document.getElementById('beatScan'), beatRebuild = document.getElementById('beatRebuild'), beatScrim = document.getElementById('beatScrim');
+const beatScan = document.getElementById('beatScan'), beatRebuild = document.getElementById('beatRebuild'), beatScrim = document.getElementById('beatScrim'), beatsEl = document.getElementById('beats');
+const coolVeilEl = document.getElementById('coolVeil'), siteBodyEl = document.getElementById('siteBody');   // canvas-release: blue wash + the site content that fades in
 const beatLead = document.getElementById('beatLead'), beatBrand = document.getElementById('beatBrand');
 const beatSharp = beatBrand.querySelector('.d-sharp'), beatBlur = beatBrand.querySelector('.d-blur');
 function beatBand(x,a,b,c,d){ if(x<=a||x>=d) return 0; if(x<b) return (x-a)/(b-a); if(x>c) return (d-x)/(d-c); return 1; } // 0→1→hold→1→0
@@ -599,7 +783,7 @@ function updateBeats(p){
   updateBrand(p);                                              // XRZENO last (updates xrReveal), once the camera is settled
   deliverFade += ((xrReveal > 0.97 ? 1 : 0) - deliverFade) * 0.015;      // once XRZENO is formed, DELIVER slowly retires — no interaction
   showBeat(beatLead, beatBand(p, 0.72, 0.84, 2, 3) * (1 - deliverFade)); // comes in on the pull-back, then auto-fades out
-  beatScrim.style.opacity = (xrReveal * 0.45).toFixed(3);               // light scrim under the finale (complements the light-dim)
+  beatScrim.style.opacity = (xrReveal * 0.45 * (1-bodyP)).toFixed(3);   // light scrim under the finale (also fades with the canvas release)
 }
 
 // ---- desktop "View 3D Model": DOLLY out of the cinematic into a free-orbit inspect of the finished bottle ----
@@ -626,10 +810,29 @@ function exitInspect(){
 }
 arBtn.addEventListener('click', ()=> inspectMode ? exitInspect() : enterInspect());
 
+// ===== BODY SCROLL HANDOFF =====
+// Once the site has fully faded in, FREEZE the page scroll and let #siteBody own scrolling — one active scroll zone (no window-vs-body desync, no pointer-events gesture-eating).
+// Pull up at the very top of the site → pop back into the narrative, which resumes easing from ~0.9.
+const RAMP = ()=> innerHeight*0.8;                       // bodyP ramp length (must match the bodyP formula + the #release height)
+let bodyLocked = false, pendingSection = null;
+function enterBodyLock(){ bodyLocked=true; document.documentElement.style.overflow='hidden'; document.body.style.overflow='hidden';
+  const t = pendingSection && document.getElementById(pendingSection); pendingSection=null;
+  siteBodyEl.scrollTop = t ? Math.max(0, t.offsetTop-14) : 0; }   // land on a drawer-requested section, else the top
+function exitBodyLock(){ if(!bodyLocked) return; bodyLocked=false; document.documentElement.style.overflow=''; document.body.style.overflow='';
+  window.scrollTo(0, (trackEl.offsetHeight - innerHeight) + RAMP()*0.9); }   // land at bodyP≈0.9 so the narrative eases back as they keep scrolling up
+window.addEventListener('wheel', e=>{ if(bodyLocked && siteBodyEl.scrollTop<=0 && e.deltaY<0){ e.preventDefault(); exitBodyLock(); } }, {passive:false});
+// drawer nav → scroll to a body section, lock-aware. From the narrative it flies the whole rail into the body (the ~1s happy accident), then lands on the section.
+window.__nav = (id)=>{ const t=document.getElementById(id); if(!t) return;
+  if(bodyLocked){ siteBodyEl.scrollTo({top:Math.max(0,t.offsetTop-14), behavior:'smooth'}); }
+  else { pendingSection=id; window.scrollTo({top: document.documentElement.scrollHeight - innerHeight, behavior:'smooth'}); } };
+
 (function loop(){
   if(!isMobile && !inspectMode) targetF = splitProgress();   // desktop scroll drives form; frozen while inspecting
   curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
   curJ += (journeyP-curJ)*0.1; if(Math.abs(journeyP-curJ)<0.0004) curJ=journeyP;   // damped, but the pose is read from curJ → reversible
+  bodyP = clamp((scrollY - (trackEl.offsetHeight - innerHeight)) / (innerHeight*0.8));  // 0 through the narrative, eases to 1 across the runway (~0.8 screens)
+  if(!isMobile && !bodyLocked && bodyP>=0.99) enterBodyLock();   // fully faded in → hand scrolling to the site (freeze page scroll)
+  if(bodyLocked) bodyP=1;                                        // stay pinned at full while the site owns the scroll
   setForm(curF);
   if(dustPivot){ const u = 1 - clamp(curF/0.7); dustPivot.rotation.y = u*1.3 + performance.now()*0.00006*u; } // index2-style swirl: spiral-in + drift, unwinds to a clean lock by 70%
   if(window._dust){ const D=window._dust; const din=clamp((curF-0.6)/0.4); D.mat.opacity = 0.55*din; // ambient dust fades in with the scene, then drifts forever
@@ -648,21 +851,23 @@ arBtn.addEventListener('click', ()=> inspectMode ? exitInspect() : enterInspect(
     }
   }
   blurOn = !inspectMode && modelReady && curF>0.92 && curJ<0.88;  // DOF off while inspecting + on the #5 wide deliver
-  arEl.classList.toggle('show', inspectMode || curF>0.985);       // button appears only after FULL materialization (stays visible to allow exit)
+  arEl.classList.toggle('show', (inspectMode || curF>0.985) && bodyP<0.02); // after full materialization; hidden once the body is in view
   hintEl.classList.toggle('gone', curF>0.92);        // gone at full formation (class kills the pulse; inline opacity was overridden by the animation)
+  let revF = xrReveal;                               // reveal-factor: drives BOTH the lights-down dim AND the cold relight (so they stay in lockstep)
   if(tween){                                         // ===== DOLLY: smooth camera move into/out of inspect =====
     const s = smoothstep(clamp((performance.now()-tween.start)/tween.dur));
     camera.position.lerpVectors(tween.fromP, tween.toP, s);
     controls.target.lerpVectors(tween.fromT, tween.toT, s);
     camera.lookAt(controls.target);
     setJourneyMaterial(1); hideBeats();              // finished bottle, no text during the move
-    renderer.toneMappingExposure = inspectMode ? exposure*(1 - 0.55*xrReveal*(1-s))  // entering: dim → full
-                                               : exposure*(1 - 0.55*xrReveal*s);      // exiting: full → dim
+    revF = inspectMode ? xrReveal*(1-s) : xrReveal*s; // entering → 0 (warm up), exiting → back to the rail's cold
+    renderer.toneMappingExposure = exposure*(1 - 0.55*revF);
     if(s >= 1){ const then = tween.then; tween = null; if(then) then(); }
   } else if(inspectMode){                            // ===== INSPECT: free-orbit the finished bottle, lights up, dust kept =====
     controls.enabled = true; controls.update();      // free orbit ±45°
     setJourneyMaterial(1);                           // force the final PBR bottle + glass
     hideBeats();                                     // no journey/finale text while inspecting
+    revF = 0;                                        // 3D view is ALWAYS default warm light, never blue
     renderer.toneMappingExposure = exposure;         // lights back to full
   } else if(!isMobile && (journeyP > 0.0005 || curJ > 0.0005)){ // JOURNEY (Step 2): rail owns the camera (pose from curJ → reversible)
     controls.enabled = false;
@@ -680,9 +885,22 @@ arBtn.addEventListener('click', ()=> inspectMode ? exitInspect() : enterInspect(
     updateBeats(curJ);
     renderer.toneMappingExposure = exposure * (1 - 0.55*xrReveal);
   }
+  // CANVAS RELEASE: the scene STAYS as an extremely blurred, cold "blobby" background; the site FADES IN over it (no scroll-up)
+  const narr = 1 - bodyP;
+  // (1) the FINALE relights the actual scene cold — warm spots ease to moonlight on the reveal-factor (genuine cold light, keeps every shadow/highlight; revF pins to 0 in 3D view)
+  const cold = clamp(revF);
+  spot.color.copy(SPOT_WARM).lerp(SPOT_COLD, cold);
+  museum.color.copy(MUS_WARM).lerp(MUS_COLD, cold);
+  // (2) THEN, only as we scroll past the finale into the body, the veil takes over as the deep-blue background
+  const cool = clamp(bodyP);
+  coolVeilEl.style.opacity = (cool*0.72).toFixed(3);
+  cv.style.filter = bodyP>0.001 ? 'blur('+(bodyP*44).toFixed(1)+'px)' : 'none';   // heavy defocus → blobby field that becomes the site's background
+  cv.style.pointerEvents = bodyP > 0.4 ? 'none' : 'auto';
+  beatsEl.style.opacity = narr;                       // finale wordmark fades out
+  siteBodyEl.style.opacity = bodyP.toFixed(3);        // site content FADES IN over the blobby bg (no panel, no scroll-up)
+  siteBodyEl.style.pointerEvents = bodyP >= 0.98 ? 'auto' : 'none';   // don't capture scroll until the fade is done, else the entrance stalls
   renderMaskBlur();
-  // bloom the dust embers — strength fades 0.85→0 as it forms, pass off once fully formed (index2)
-  const formed = clamp((curF-0.55)/0.45);
+  const formed = clamp((curF-0.55)/0.45);            // bloom the dust embers — strength fades 0.85→0 as it forms
   bloom.strength = 0.85 * (1 - formed);
   bloom.enabled  = modelReady && formed < 1;
   compositePass.uniforms.tSharp.value   = sharpRT.texture;
@@ -692,6 +910,33 @@ arBtn.addEventListener('click', ()=> inspectMode ? exitInspect() : enterInspect(
   composer.render();
   requestAnimationFrame(loop);
 })();
+</script>
+
+<!-- ===== SITE BODY behaviors: i18n copy swap + compare slider (drawer is Step 2) ===== -->
+<script>
+  const WA_NUMBER='6282342736941';
+  let bodyLang = /[?&]lang=id/.test(location.search) ? 'id' : 'en';
+  function applyLang(){
+    const S = (window.XR_STRINGS||{})[bodyLang]; if(!S) return;
+    document.querySelectorAll('[data-i18n]').forEach(el=>{ const s=S[el.dataset.i18n]; if(s) el.textContent=s; });
+    document.documentElement.lang = bodyLang;
+    const wa='https://wa.me/'+WA_NUMBER+'?text='+encodeURIComponent(S['cta.waPrefill']||'');
+    const c=document.getElementById('ctaWA'); if(c) c.href=wa;
+    const d=document.getElementById('drawerWA'); if(d) d.href=wa;
+  }
+  applyLang();
+  const cmpEl=document.getElementById('cmp');
+  if(cmpEl) cmpEl.querySelector('input').addEventListener('input', e=> cmpEl.style.setProperty('--x', e.target.value+'%'));
+
+  // ---- drawer (nav / escape hatch) ----
+  const ctl=document.getElementById('drawerCtl'), drawer=document.getElementById('drawer'), scrim=document.getElementById('scrim');
+  function setDrawer(open){ drawer.classList.toggle('open',open); scrim.classList.toggle('on',open); ctl.setAttribute('aria-expanded',open); }
+  ctl.addEventListener('click', ()=> setDrawer(!drawer.classList.contains('open')));
+  scrim.addEventListener('click', ()=> setDrawer(false));
+  addEventListener('keydown', e=>{ if(e.key==='Escape') setDrawer(false); });
+  drawer.querySelectorAll('a[data-nav]').forEach(a=> a.addEventListener('click', e=>{ e.preventDefault(); setDrawer(false); if(window.__nav) window.__nav(a.dataset.nav); }));
+  const dwa=document.getElementById('drawerWA'); if(dwa) dwa.addEventListener('click', ()=> setDrawer(false));
+  const lt=document.getElementById('langToggle'); if(lt) lt.addEventListener('click', e=>{ e.preventDefault(); bodyLang = bodyLang==='en'?'id':'en'; applyLang(); });
 </script>
 </body>
 </html>
