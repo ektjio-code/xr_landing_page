@@ -27,6 +27,8 @@
   @media (pointer:coarse){
     #track{height:100vh;}        /* collapse the 400vh scroll track so the page can't scroll */
     #stage{touch-action:none;}   /* capture pinch/drag; suppress native scroll + pinch-zoom */
+    body.unlocked #track{height:auto;}         /* pinch-formed → release the page scroll (body below provides the height) */
+    body.unlocked #stage{touch-action:pan-y;}  /* vertical drag scrolls; horizontal still rotates the hero bottle */
   }
 
   /* CTA / AR button */
@@ -78,7 +80,7 @@
   <button id="arBtn">View in your space</button>
 </div>
 
-<div id="hint">Scroll to materialize ↓</div>
+<div id="hint">Pinch to materialize</div>
 <div id="toast"></div>
 
 <script type="importmap">
@@ -402,6 +404,12 @@ function setForm(f){
   points.visible = meshIn < 1; // hard-hide once fully formed — no stray dots on or around the mesh
 }
 
+// ---- Stage 1: pinch-gate → scroll-unlock. Once formed (curF≈0.98), a 600ms guard then release the page scroll so the body below is reachable. Reversible: disperse back at the top re-locks. ----
+const hintEl = document.getElementById('hint');
+let scrollUnlocked=false, unlockTimer=null;
+function unlockScroll(){ scrollUnlocked=true; unlockTimer=null; document.body.classList.add('unlocked'); }
+function relockScroll(){ if(unlockTimer){ clearTimeout(unlockTimer); unlockTimer=null; } if(scrollUnlocked && scrollY<5){ scrollUnlocked=false; document.body.classList.remove('unlocked'); } }
+
 function loop(){
   if(!isMobile) targetF = scrollProgress(); // desktop: scroll drives form. mobile: pinch sets targetF.
   curF += (targetF-curF)*0.1;
@@ -423,7 +431,14 @@ function loop(){
 
   // UI
   toggleEl(document.getElementById('ar'), curF>0.85);
-  document.getElementById('hint').style.opacity = curF>0.04?'0':'';
+  if(isMobile){                                          // pinch-gate → scroll-unlock
+    if(curF>0.98){ if(!scrollUnlocked && unlockTimer===null) unlockTimer=setTimeout(unlockScroll,600); }
+    else if(curF<0.9) relockScroll();
+    hintEl.textContent = scrollUnlocked ? 'Scroll to explore ↓' : 'Pinch to materialize';
+    hintEl.style.opacity = (scrollUnlocked || curF<0.04) ? '' : '0';
+  } else {
+    hintEl.style.opacity = curF>0.04?'0':'';
+  }
 
   // Always render through the composer — glass is plain alpha (not transmission), so no need to bypass
   // it, and NOT switching render paths avoids a full material recompile (that was the formation stutter).
