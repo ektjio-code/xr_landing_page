@@ -148,6 +148,12 @@
   footer{position:relative;z-index:2;background:transparent;border-top:1px solid var(--hairline);padding:34px 6vw;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
   footer a{color:var(--muted);text-decoration:none}
   footer .fb{font-family:var(--disp);font-weight:700;letter-spacing:.28em;color:var(--ink)}
+  /* body life: reveal-on-scroll + card hover-lift (so the site doesn't go flat after the hero) */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  .card.reveal{transition:opacity .6s ease,transform .45s cubic-bezier(.2,.7,.2,1),border-color .35s,box-shadow .35s}
+  .card:hover{transform:translateY(-5px);border-color:rgba(120,150,255,.4);box-shadow:0 18px 50px rgba(0,0,0,.45)}
+  @media (prefers-reduced-motion:reduce){ .reveal{opacity:1 !important;transform:none !important;transition:none} }
 </style>
 </head>
 <body>
@@ -689,6 +695,16 @@ loop();
   }));
   const dwa=document.getElementById('drawerWA'); if(dwa) dwa.addEventListener('click', ()=> setDrawer(false));
   const lt=document.getElementById('langToggle'); if(lt) lt.addEventListener('click', e=>{ e.preventDefault(); bodyLang = bodyLang==='en'?'id':'en'; applyLang(); });
+
+  // ---- body life: reveal each section/card/step as it scrolls into the site ----
+  (function(){
+    const root=document.getElementById('siteBody'); if(!root || !('IntersectionObserver' in window)) return;
+    const items=[...root.querySelectorAll('.eyebrow,h2,.lede,.cmp,.card,.step,.faq details,.btnrow,.note,footer .fb,footer span')];
+    items.forEach(el=>el.classList.add('reveal'));
+    root.querySelectorAll('.cards>.card,.steps>.step').forEach(el=>{ el.style.transitionDelay=([...el.parentNode.children].indexOf(el)*90)+'ms'; });
+    const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }),{root,threshold:0.12,rootMargin:'0px 0px -8% 0px'});
+    items.forEach(el=>io.observe(el));
+  })();
 </script>
 </body>
 </html>
