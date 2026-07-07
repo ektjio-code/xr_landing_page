@@ -46,6 +46,7 @@
   #hint{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:40;
     color:var(--muted);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
     animation:fade 2.6s infinite;transition:opacity .4s;}
+  #hint.gone{opacity:0;animation:none;}  /* MUST kill the animation — a running keyframe overrides inline opacity, so the hint would keep pulsing under "Tap to explore" */
   /* "Tap to explore" — sits below the AR button, appears once the bottle is formed; tapping runs the blur-into-site transition */
   #explore{position:fixed;bottom:3.4%;left:50%;transform:translateX(-50%);z-index:31;
     color:var(--ink);font-size:12px;letter-spacing:.2em;text-transform:uppercase;
@@ -595,6 +596,8 @@ function enterSite(){
   setTimeout(()=>{ document.body.classList.add('entered'); live3D=false; }, 950); // site is in → disable the 3D loop
 }
 if(exploreEl) exploreEl.addEventListener('click', enterSite);
+// tap ANYWHERE once the bottle is fully formed → enter the site. A rotate/pinch preventDefaults touchmove so it won't fire a click; only a real tap does. Controls (AR, drawer) are excepted so they still work.
+addEventListener('click', e=>{ if(!entering && curF>0.98 && !e.target.closest('#ar,#drawerCtl,#drawer,#scrim')) enterSite(); });
 window.__enter = enterSite;                                 // drawer nav triggers the same transition
 
 function loop(){
@@ -618,12 +621,8 @@ function loop(){
 
   // UI
   toggleEl(document.getElementById('ar'), curF>0.85);
-  if(isMobile){
-    if(!entering && exploreEl) exploreEl.classList.toggle('show', curF>0.98); // "Tap to explore" once formed
-    hintEl.style.opacity = curF<0.04 ? '' : '0';           // "Pinch to materialize" fades once pinching starts
-  } else {
-    hintEl.style.opacity = curF>0.04?'0':'';
-  }
+  hintEl.classList.toggle('gone', curF>0.04);              // "Pinch to materialize" truly hides once pinching starts (kills the pulse)
+  if(isMobile && !entering && exploreEl) exploreEl.classList.toggle('show', curF>0.98); // "Tap to explore" swaps in once formed
 
   // Always render through the composer — glass is plain alpha (not transmission), so no need to bypass
   // it, and NOT switching render paths avoids a full material recompile (that was the formation stutter).
