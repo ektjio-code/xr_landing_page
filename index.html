@@ -119,6 +119,7 @@
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
   .card{background:var(--bg-deep);border:1px solid var(--hairline);padding:14px 14px 18px}
   .card model-viewer{width:100%;aspect-ratio:1/1.05;background:radial-gradient(80% 90% at 50% 38%,#0f1c3a 0%,var(--bg-deep) 70%)}
+  .card model-viewer::part(default-ar-button){display:none} /* AR is fired by the "View in your space" link instead */
   .card h3{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.06em;margin:14px 4px 3px}
   .card p{color:var(--muted);font-size:13.5px;margin:0 4px 14px}
   .card .arb{display:inline-block;color:var(--ink);text-decoration:none;font-size:13.5px;border:1px solid rgba(200,215,255,.30);border-radius:100px;padding:9px 18px;margin:0 4px;background:rgba(255,255,255,.04);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:background .3s,border-color .3s}
@@ -198,21 +199,21 @@
     <div class="cards">
       <div class="card">
         <model-viewer src="shinobu_2k_ar.glb" ios-src="shinobu_2k_ar.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
-          exposure="0.9" shadow-intensity="1" interaction-prompt="none" alt="Shinobu whisky bottle"></model-viewer>
+          exposure="0.9" shadow-intensity="1" interaction-prompt="none" alt="Shinobu whisky bottle"><button slot="ar-button" hidden aria-hidden="true"></button></model-viewer>
         <h3>Shinobu — whisky bottle</h3>
         <p>Photogrammetry · glass + label rebuild</p>
         <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
       </div>
       <div class="card">
         <model-viewer src="ASSET_2.glb" ios-src="ASSET_2.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
-          exposure="0.9" shadow-intensity="1" alt="Product 2"></model-viewer>
+          exposure="0.9" shadow-intensity="1" alt="Product 2"><button slot="ar-button" hidden aria-hidden="true"></button></model-viewer>
         <h3>Asset 2 — title</h3>
         <p>One-line craft note</p>
         <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
       </div>
       <div class="card">
         <model-viewer src="ASSET_3.glb" ios-src="ASSET_3.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
-          exposure="0.9" shadow-intensity="1" alt="Product 3"></model-viewer>
+          exposure="0.9" shadow-intensity="1" alt="Product 3"><button slot="ar-button" hidden aria-hidden="true"></button></model-viewer>
         <h3>Asset 3 — title</h3>
         <p>One-line craft note</p>
         <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
@@ -655,6 +656,13 @@ loop();
   applyLang();
   const cmpEl=document.getElementById('cmp');
   if(cmpEl) cmpEl.querySelector('input').addEventListener('input', e=> cmpEl.style.setProperty('--x', e.target.value+'%'));
+
+  // "View in your space" fires the card's model-viewer AR (its own default AR button is suppressed)
+  document.querySelectorAll('.card .arb').forEach(a=> a.addEventListener('click', e=>{
+    e.preventDefault();
+    const mv = a.closest('.card') && a.closest('.card').querySelector('model-viewer');
+    if(mv && mv.activateAR) mv.activateAR();
+  }));
 
   // ---- drawer (nav / escape hatch) — mobile uses native anchor scroll, and releases the pinch-gate on nav ----
   const ctl=document.getElementById('drawerCtl'), drawer=document.getElementById('drawer'), scrim=document.getElementById('scrim');
