@@ -1,52 +1,49 @@
-# XRZENO — Session handover (2026-07-07, updated end of day)
+# XRZENO — Session handover (2026-07-07, end of day 2)
 
-Read this, then `CLAUDE.md` (same folder) for the deep per-step history. This doc is where things actually stand right now.
+Read this, then `CLAUDE.md` (same folder) for the deep per-step history and levers.
 
 ## TL;DR
-The desktop narrative (`index_v2.html`) plus the DOM **body** and the **canvas-to-website handoff** are done and confirmed, and the **drawer nav is built**. All committed and pushed (`175d881` on `origin/main`). The transition that was "in flight" last handover is now settled: the 3D scene **relights cold**, then blurs into a cold blobby background that stays, and the site fades in over it. The body is themed on the Monture cold blue palette with a warm-orange highlight (teal/orange split).
+Desktop AND mobile are now **feature-complete pending real assets.** Everything is committed and pushed (`origin/main` at `0bdf587`). Next session is Ed dropping in the real assets.
+
+## Where it stands
+- **Desktop (`index_v2.html`, three r0.169):** cinematic narrative (materialize → journey rail → clay/final → beats → cold-night finale relight → solid-white XRZENO) → scroll-lock handoff blurs the scene into a cold background and the site fades in over it → cold Monture-themed body + drawer. Plus mouse parallax on the rail, perf-freeze once the site is in, and reveal-on-scroll body life.
+- **Mobile (`index.html`, three r0.160):** pinch to materialize (1-finger rotate, kept AR button) → **tap anywhere once formed** → the 3D defocuses and the website blurs into view → 3D disabled. Same cold body + drawer + social. No beats/finale on mobile (scratched — too busy for the small screen).
+- Both drawers: Portfolio / How it works / FAQ / Contact + EN↔ID toggle + WhatsApp + a social row (Instagram, TikTok, Threads, Facebook, X).
 
 ## File / git state
-- The working file is the **repo-root copy**: `XRLanding\index_v2.html`. This is the truth.
-- `Full Website\index_v2.html` was stale; it has now been **reconciled** (copied from repo-root) and committed, so the two are identical again. Keep them in sync going forward, or merge to one file later.
-- `strings.js` (repo root) is committed. `index_v2.html` loads it plus model-viewer from CDN.
-- Last commit `175d881` (pushed to origin/main): cold finale relight, scroll-lock handoff, blue palette + teal/orange, glass buttons, drawer.
-- NOT committed on purpose: `.claude/settings.json` (harness noise, pinned), `Full Website/CLAUDE.md` + `handover.md` (docs, updating now), the `xrzeno-concept` package/zip, `Screenshot_8.png`.
-- Live homepage still serves the OLD scene; `index_v2.html` is unreferenced. Deployment/hosting OUT OF SCOPE (Ed's web admins own it, pinned).
+- Working files: repo-root `index_v2.html` (desktop, truth) and `index.html` (mobile). `strings.js` (EN+ID) at repo root, loaded by both.
+- `Full Website/index_v2.html` is kept **in sync** with the repo-root copy (reconciled every desktop commit). Mobile `index.html` has no second copy.
+- NOT committed on purpose: `.claude/settings.json` (pinned), the `xrzeno-concept` package/zip, `Screenshot_8.png`.
+- ⚠️ **Git flakiness:** `.git` writes intermittently fail (repack `Permission denied`, `couldn't set 'refs/...'`) — almost certainly OneDrive/AV locking files under "WORK STUFF". `gc.auto`/`maintenance.auto` are disabled to reduce it. Pushes still land on GitHub; when a ref-write errors, verify with `git ls-remote origin -h refs/heads/main` (the local tracking ref lags, shows false "ahead"). Real fix (Ed): exclude the repo `.git` from OneDrive/AV, or move the repo out of the synced folder.
 
 ## How to run / test
-- Server from repo root: `python -m http.server 8000 --bind 127.0.0.1` (dies between sessions, restart it).
-- URL: `http://127.0.0.1:8000/index_v2.html?stay` (the `?stay` overrides the mobile redirect).
-- Indonesian copy: `&lang=id`, or use the drawer language toggle.
-- After a JS edit, extract the module and `node --check` it (awk one-liner in shell history).
+- Desktop: `python -m http.server 8000 --bind 127.0.0.1` from repo root, open `http://127.0.0.1:8000/index_v2.html?stay`.
+- Mobile: Ed tests on a real device off the pushed GitHub Pages URL (`ektjio-code.github.io/...`), not localhost. **So push after every mobile change.**
+- `&lang=id` or the drawer toggle for Indonesian. After a JS edit, extract the module and `node --check`.
 
-## What was confirmed this session (2026-07-07)
-1. **Cold-night finale relight (not a veil).** At the XRZENO finale the actual scene lights ease from warm to cold moonlight (`spot` 0xffda95 -> `#5f80e8`, `museum` 0xfff4e2 -> `#86a4ff`), riding a shared reveal-factor `revF` in the loop so the lights-down dim and the cold relight stay in lockstep. Earlier attempts at a full-screen blue veil / multiply gel were rejected by Ed ("it's still a veil dude") in favour of relighting. `revF` is pinned to 0 in 3D-view/inspect so free-cam is always default warm.
-2. **Canvas-to-site handoff = scroll-lock.** The `#coolVeil` (blue radial) now only carries the body **background** transition, driven by `bodyP`. Past `#track` there is an `#release` runway (`80vh` = 0.8 screens, cut to 1/3 after Ed found the longer version too slow). Once the site fully fades in (`bodyP>=0.99`) `enterBodyLock()` freezes the page scroll (`documentElement/body overflow:hidden`) and `#siteBody` (fixed, `overflow-y:auto`, `overscroll-behavior:none`) owns scrolling. Pull up at the site's top -> a `wheel` listener calls `exitBodyLock()`, restores page scroll at `bodyP~=0.9`, and the narrative eases back. One active scroll zone at all times, no desync.
-3. **Body themed to the Monture cold palette**, scoped to `#siteBody` so the warm narrative is untouched: `--accent:#1e40ff` cobalt, `--ink:#eaf1ff`, `--bg-deep:#0a1633` navy, cool hairlines. **Teal/orange split:** warm `--warm:#ff8a3d` is reserved for the one *highlighted* action (both WhatsApp CTAs, identical solid pills) plus the compare-slider signature line. Everything else is cold.
-4. **Frosted-glass buttons.** Non-highlighted buttons (Email, portfolio AR) took the "View 3D Model" treatment: transparent + `backdrop-filter:blur(6px)` + thin cool border + pill. The `#ar` "View 3D Model" button keeps its warm border (it lives in the warm narrative) — shared glass *treatment*, border tint matches each button's world.
-5. **Drawer built (was build-step 2).** The corner `XRZENO` is now `#drawerCtl` (button + chevron, z-index 100) opening a **translucent blue glass pane** `#drawer` (`rgba(18,34,82,.42)` + `blur(16px)`). Links: Portfolio / How it works / FAQ / Contact, an EN<->ID language toggle (re-renders copy in place), and a solid-warm WhatsApp deep link matching the bottom CTA. Nav is **lock-aware** (`window.__nav`): from the narrative it flies the whole rail into the body (~1s happy accident preserved) then lands on the section; from inside the site it smooth-scrolls `#siteBody`. Scrim + Escape close it.
+## TOMORROW — assets (Ed inputs), then finalize
+1. **Portfolio:** GLB/USDZ for cards 2 & 3 (card 1 already uses `shinobu_2k_ar.glb/.usdz`). Update `src`/`ios-src` + titles in both files' portfolio cards.
+2. **Compare slider:** the real photo + render pair. They MUST be the same angle/framing or the compare trick dies. Currently placeholder gradients (`.ph-real` warm, `.ph-render` cold); swap to `background-image:url(...)`.
+3. **Social handles:** real URLs for the 5 drawer icons (currently `instagram.com/xrzeno` etc. placeholders) in both files.
+4. **Copy dash-sweep** (deferred to finalization): strip AI-dash tells from `strings.js` (EN+ID) and body copy. ID copy is machine-drafted — native review before launch.
 
-## Next-session priorities (in order)
-1. **Perf: freeze the settled background.** The full Three.js composer loop still renders forever behind the site. Once the blurred cold background settles, freeze it to a static image/texture and stop/skip the RAF so the site stays light. Reversible on scroll-up.
-2. **Real assets (NEED FROM ED):** portfolio GLB/USDZ set (cards 2 and 3 are placeholders, card 1 can use the bottle) and the real photo+render pair for the slider (must be SAME angle/framing or the compare trick dies).
-3. **Mouse parallax (Step 7):** the parked +/-2-3 degree camera lean on the rail, the antidote to the "on-rails" feel.
-4. **Mobile (Step 5):** pinch-gate -> scroll-unlock + the body/drawer on the `index.html` lineage (pure DOM ports 1:1; the 3D journey is the expensive part).
-
-## Known rough edges
-- While scroll-locked in the site, **keyboard scrolling** (space/PageDown/arrows) won't move it unless `#siteBody` has focus, since the window is frozen. Wheel/trackpad work. Add keyboard parity if wanted.
-- Git threw a `Permission denied` on a background **repack** during commit (auto-maintenance), not on the commit itself. If future git ops complain, something has a lock on `.git/objects/pack`.
+## Parked / possible later (not blocking)
+- The compare-slider one-time "nudge" hint on reveal (signals it's draggable) — proposed, not built.
+- Desktop keyboard-scroll parity inside the locked site (space/PageD, currently wheel/trackpad only).
+- Three.js version convergence (0.160 mobile vs 0.169 desktop).
+- Deployment/hosting is OUT OF SCOPE (Ed's web admins own it).
 
 ## Working style and pins (honour these)
-- One change at a time, test live, discuss when asked. Ed eyeballs everything, he cannot see my screen. (Relaxed to batch-and-eyeball when he asks for speed.)
-- **Ignore hosting/deploy/DNS/cutover entirely.** Web admins own it.
-- **Watch the AI-copywriting tell (dashes).** The copy dash sweep on `strings.js` + body text is DEFERRED to finalization (Ed's call), not mid-build.
-- Keep Ed's real email out of git, commits use `ed@localhost`.
-- Do not commit `.claude/settings.json`.
-- He goes by Ed.
+- One change at a time, test live. Ed eyeballs everything and cannot see my screen. (Batch-and-eyeball is fine when he asks for speed.)
+- **Push after every mobile change** so Ed can test on device; flag natural checkpoints.
+- **Watch the AI-copywriting dash tell** in copy and prose. The copy sweep is deferred to finalization.
+- **Ignore hosting/deploy/DNS entirely.**
+- Commits use `ed@localhost`; do not commit `.claude/settings.json`. He goes by Ed.
 
 ## Load-bearing gotchas
-- The finale relight and the rail read from **damped scalars** (`xrReveal`, `curJ`) and set state DIRECTLY, so everything is reversible on scroll-up. Do not reintroduce a per-frame `camera.position.lerp` follow, it lags asymmetrically and breaks reverse-scroll.
-- A running CSS `animation` overrides inline `style.opacity` (hid the pulsing hint with a `.gone{opacity:0;animation:none}` class, not opacity alone).
-- The scroll-lock magic number (`RAMP = innerHeight*0.8`) must stay matched to the `bodyP` formula denominator AND the `#release` height, or the fade won't land at the page bottom.
-- `--warm` is defined only inside `#siteBody`; the drawer (outside it) hardcodes `#ff8a3d`. Keep those in sync when tuning the orange.
-- Camera JSON, material timings, dust flare, inspect/dolly details all live in `CLAUDE.md`. Do not re-derive them.
+- Reversibility: the rail, relight, and parallax read from **damped scalars** and set state DIRECTLY. Never a per-frame `camera.position.lerp` follow (lags asymmetrically, breaks reverse-scroll).
+- A running CSS `animation` overrides inline `style.opacity` — hide pulsing elements with a class that sets `animation:none` (both the desktop hint and the mobile hint hit this).
+- Desktop scroll-lock magic number `RAMP=innerHeight*0.9` must stay matched to the `bodyP` denom AND `#release` height.
+- Reveal-on-scroll uses a **viewport** IntersectionObserver root, not `#siteBody` (the fixed internally-scrolled container didn't fire it on desktop).
+- `--warm` is `#siteBody`-scoped; the drawer hardcodes `#ff8a3d`. Keep in sync.
+- Mobile entry is a TAP, not scroll (scroll fought the camera orbit). Do not reintroduce mobile scroll-into-body.
