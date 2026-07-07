@@ -734,6 +734,7 @@ addEventListener('resize', ()=>{
   W=innerWidth;H=innerHeight; renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix();
   [sharpRT,maskRT,maskTmp,maskFeather,blurA,blurB,bloomRT].forEach(t=>t.dispose());
   allocTargets(); composer.setSize(W,H); bloom.setSize(W,H);
+  if(rafPaused){ rafPaused=false; loop(); }   // frozen behind the site: render one fresh frame at the new size (loop re-freezes itself)
 });
 
 if(isMobile){ // pinch (2-finger) drives the materialize; 1-finger still orbits via OrbitControls
@@ -814,19 +815,20 @@ arBtn.addEventListener('click', ()=> inspectMode ? exitInspect() : enterInspect(
 // Once the site has fully faded in, FREEZE the page scroll and let #siteBody own scrolling — one active scroll zone (no window-vs-body desync, no pointer-events gesture-eating).
 // Pull up at the very top of the site → pop back into the narrative, which resumes easing from ~0.9.
 const RAMP = ()=> innerHeight*0.8;                       // bodyP ramp length (must match the bodyP formula + the #release height)
-let bodyLocked = false, pendingSection = null;
+let bodyLocked = false, pendingSection = null, rafPaused = false;
 function enterBodyLock(){ bodyLocked=true; document.documentElement.style.overflow='hidden'; document.body.style.overflow='hidden';
   const t = pendingSection && document.getElementById(pendingSection); pendingSection=null;
   siteBodyEl.scrollTop = t ? Math.max(0, t.offsetTop-14) : 0; }   // land on a drawer-requested section, else the top
 function exitBodyLock(){ if(!bodyLocked) return; bodyLocked=false; document.documentElement.style.overflow=''; document.body.style.overflow='';
-  window.scrollTo(0, (trackEl.offsetHeight - innerHeight) + RAMP()*0.9); }   // land at bodyP≈0.9 so the narrative eases back as they keep scrolling up
+  window.scrollTo(0, (trackEl.offsetHeight - innerHeight) + RAMP()*0.9);   // land at bodyP≈0.9 so the narrative eases back as they keep scrolling up
+  if(rafPaused){ rafPaused=false; loop(); } }   // scene was frozen behind the site → wake the render loop
 window.addEventListener('wheel', e=>{ if(bodyLocked && siteBodyEl.scrollTop<=0 && e.deltaY<0){ e.preventDefault(); exitBodyLock(); } }, {passive:false});
 // drawer nav → scroll to a body section, lock-aware. From the narrative it flies the whole rail into the body (the ~1s happy accident), then lands on the section.
 window.__nav = (id)=>{ const t=document.getElementById(id); if(!t) return;
   if(bodyLocked){ siteBodyEl.scrollTo({top:Math.max(0,t.offsetTop-14), behavior:'smooth'}); }
   else { pendingSection=id; window.scrollTo({top: document.documentElement.scrollHeight - innerHeight, behavior:'smooth'}); } };
 
-(function loop(){
+function loop(){
   if(!isMobile && !inspectMode) targetF = splitProgress();   // desktop scroll drives form; frozen while inspecting
   curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
   curJ += (journeyP-curJ)*0.1; if(Math.abs(journeyP-curJ)<0.0004) curJ=journeyP;   // damped, but the pose is read from curJ → reversible
@@ -908,8 +910,11 @@ window.__nav = (id)=>{ const t=document.getElementById(id); if(!t) return;
   compositePass.uniforms.tMask.value    = maskFeather.texture;
   compositePass.uniforms.uEnabled.value = blurOn ? 1 : 0;
   composer.render();
+  // PERF FREEZE: once the scene is fully settled behind the locked site, stop the RAF. WebGL keeps showing the last frame (under its CSS blur) so the blobby background is unchanged; the whole loop just stops running behind the DOM site. Woken again by exitBodyLock / resize.
+  if(bodyLocked && curF>0.999 && curJ>0.999 && xrReveal>0.999){ rafPaused=true; return; }
   requestAnimationFrame(loop);
-})();
+}
+loop();
 </script>
 
 <!-- ===== SITE BODY behaviors: i18n copy swap + compare slider (drawer is Step 2) ===== -->
