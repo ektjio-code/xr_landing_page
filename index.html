@@ -8,6 +8,10 @@
   if(!/[?&]stay/i.test(location.search) && !matchMedia('(pointer:coarse)').matches) location.replace('index_scene.html');
 </script>
 <title>XRZENO — Materialize</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+<script src="strings.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   :root{
@@ -25,10 +29,12 @@
   #gl{display:block;width:100%;height:100%;}
   /* MOBILE (touch): no scrolling — a pinch drives the form. Single fixed viewport. */
   @media (pointer:coarse){
-    #track{height:100vh;}        /* collapse the 400vh scroll track so the page can't scroll */
-    #stage{touch-action:none;}   /* capture pinch/drag; suppress native scroll + pinch-zoom */
-    body.unlocked #track{height:auto;}         /* pinch-formed → release the page scroll (body below provides the height) */
-    body.unlocked #stage{touch-action:pan-y;}  /* vertical drag scrolls; horizontal still rotates the hero bottle */
+    body{overflow:hidden;}                     /* scroll LOCKED until the bottle is pinch-formed */
+    body.unlocked{overflow-y:auto;overflow-x:hidden;}  /* pinch-formed → release: the body below is now reachable */
+    #track{height:100vh;}
+    #stage{touch-action:none;}                 /* capture pinch/drag; suppress native scroll + pinch-zoom */
+    body.unlocked #stage{touch-action:pan-y;}  /* vertical drag scrolls into the body; horizontal still spins the hero */
+    body.unlocked #ar{opacity:0;pointer-events:none;}  /* hero AR button retires once you scroll into the site */
   }
 
   /* CTA / AR button */
@@ -65,12 +71,84 @@
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   #toast b{color:var(--accent);font-weight:600;letter-spacing:.02em;}
   #toast .t-sub{display:block;margin-top:6px;color:var(--muted);font-size:13px;}
+
+  /* ===== SITE BODY (ported from desktop index_v2, Monture cold palette + teal/orange). On mobile it's NORMAL FLOW below the hero, opaque cold bg; the pinch-gate releases the scroll into it. ===== */
+  html{scroll-behavior:smooth}
+  :root{ --disp:'Montserrat',system-ui,sans-serif; --body:system-ui,-apple-system,sans-serif; }
+  /* DRAWER: corner XRZENO = menu / escape hatch. Frosted blue pane, warm-orange actionable accents. */
+  #drawerCtl{position:fixed;top:15px;left:18px;z-index:100;display:flex;align-items:center;gap:8px;background:none;border:0;cursor:pointer;color:#f0ece4;font-family:'Montserrat',system-ui,sans-serif;font-size:12px;letter-spacing:.26em;font-weight:700;padding:8px}
+  #drawerCtl .chev{display:inline-block;border:solid #ff8a3d;border-width:0 2px 2px 0;padding:3px;transform:rotate(45deg) translateY(-2px);transition:transform .25s}
+  #drawerCtl[aria-expanded="true"] .chev{transform:rotate(-135deg) translateY(-2px)}
+  #drawer{position:fixed;top:0;left:0;z-index:99;height:100vh;width:min(280px,84vw);background:rgba(18,34,82,.42);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-right:1px solid rgba(120,150,255,.28);padding:84px 30px 30px;display:flex;flex-direction:column;gap:4px;transform:translateX(-102%);transition:transform .35s cubic-bezier(.3,.9,.3,1)}
+  #drawer.open{transform:translateX(0)}
+  #drawer a{color:#eaf1ff;text-decoration:none;font-family:'Montserrat',system-ui,sans-serif;font-weight:700;font-size:16px;letter-spacing:.05em;padding:9px 0;border-bottom:1px solid rgba(150,180,255,.14);transition:color .2s}
+  #drawer .d-wa{margin-top:auto;background:#ff8a3d;color:#1a0e04;border:1px solid #ff8a3d;border-bottom:1px solid #ff8a3d;border-radius:100px;text-align:center;padding:13px;font-size:14px} /* SAME as the bottom CTA */
+  #drawer .d-lang{font-size:12px;color:#93a4c7;letter-spacing:.14em;text-transform:uppercase;border-bottom:0}
+  #scrim{position:fixed;inset:0;z-index:98;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s}
+  #scrim.on{opacity:1;pointer-events:auto}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  #siteBody{position:relative;z-index:3;background:#070b16;color:var(--ink);text-shadow:0 2px 18px rgba(0,0,0,.55);
+    /* MONTURE COLD PALETTE — scoped to the site; the warm hero above keeps its own tokens */
+    --ink:#eaf1ff; --muted:#93a4c7; --accent:#1e40ff; --warm:#ff8a3d; --bg-deep:#0a1633; --hairline:rgba(150,180,255,.14); --navy:#0a1633;}
+  .sect{position:relative;z-index:2;background:transparent;padding:clamp(72px,11vh,130px) 6vw;border-top:1px solid var(--hairline)}
+  #compare{border-top:none}
+  .wrap{max-width:1060px;margin:0 auto}
+  .eyebrow{font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.34em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
+  h2{font-family:var(--disp);font-weight:800;font-size:clamp(1.9rem,4.4vw,3.2rem);letter-spacing:.01em;line-height:1.08;margin-bottom:20px}
+  .lede{color:var(--muted);max-width:56ch;margin-bottom:44px}
+  .cmp{position:relative;max-width:860px;margin:0 auto;aspect-ratio:16/10;overflow:hidden;border:1px solid var(--hairline);background:var(--bg-deep)}
+  .cmp .layer{position:absolute;inset:0;background-size:cover;background-position:center}
+  .ph-real{background-image:linear-gradient(115deg,#3a2c1d,#6b5238 55%,#281d13)}
+  .ph-render{background-image:linear-gradient(115deg,#101f3d,#2a3c60 55%,#0e1729)}
+  .cmp .top{clip-path:inset(0 calc(100% - var(--x,50%)) 0 0)}
+  .cmp .bar{position:absolute;top:0;bottom:0;left:var(--x,50%);width:2px;background:var(--warm);transform:translateX(-1px);pointer-events:none}
+  .cmp .bar::after{content:'\25C2 \25B8';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-deep);border:1px solid var(--warm);border-radius:100px;color:var(--ink);font-size:12px;letter-spacing:2px;padding:8px 12px;white-space:nowrap}
+  .cmp input[type=range]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:ew-resize;-webkit-appearance:none;appearance:none;touch-action:pan-y}
+  .cmp .tag{position:absolute;bottom:14px;font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink);background:rgba(14,12,10,.6);padding:5px 12px;pointer-events:none}
+  .cmp .tag.l{left:14px} .cmp .tag.r{right:14px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
+  .card{background:var(--bg-deep);border:1px solid var(--hairline);padding:14px 14px 18px}
+  .card model-viewer{width:100%;aspect-ratio:1/1.05;background:radial-gradient(80% 90% at 50% 38%,#0f1c3a 0%,var(--bg-deep) 70%)}
+  .card h3{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.06em;margin:14px 4px 3px}
+  .card p{color:var(--muted);font-size:13.5px;margin:0 4px 14px}
+  .card .arb{display:inline-block;color:var(--ink);text-decoration:none;font-size:13.5px;border:1px solid rgba(200,215,255,.30);border-radius:100px;padding:9px 18px;margin:0 4px;background:rgba(255,255,255,.04);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:background .3s,border-color .3s}
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:34px;counter-reset:step}
+  .step{border-top:2px solid var(--accent);padding-top:18px;counter-increment:step}
+  .step h3{font-family:var(--disp);font-weight:800;font-size:1.25rem;letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px}
+  .step h3::before{content:counter(step,decimal-leading-zero)"  ";color:var(--accent);font-weight:700}
+  .step p{color:var(--muted);font-size:15px}
+  .note{margin-top:44px;color:var(--muted);font-size:14.5px;max-width:70ch;border-left:2px solid var(--hairline);padding-left:18px}
+  .faq details{border-bottom:1px solid var(--hairline)}
+  .faq summary{cursor:pointer;list-style:none;font-family:var(--disp);font-weight:700;font-size:1.02rem;letter-spacing:.02em;padding:20px 34px 20px 0;position:relative}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:'+';position:absolute;right:6px;color:var(--accent);font-weight:700;transition:transform .25s}
+  .faq details[open] summary::after{transform:rotate(45deg)}
+  .faq details p{color:var(--muted);padding:0 0 22px;max-width:66ch}
+  .cta{text-align:center}
+  .cta .lede{margin-left:auto;margin-right:auto}
+  .btnrow{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-block;text-decoration:none;font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.03em;border-radius:100px;padding:15px 32px;transition:background .3s,border-color .3s,color .3s}
+  .btn-wa{background:var(--warm);color:#1a0e04;border:1px solid var(--warm)}
+  .btn-mail{background:rgba(255,255,255,.04);color:var(--ink);border:1px solid rgba(200,215,255,.30);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  footer{position:relative;z-index:2;background:transparent;border-top:1px solid var(--hairline);padding:34px 6vw;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
+  footer a{color:var(--muted);text-decoration:none}
+  footer .fb{font-family:var(--disp);font-weight:700;letter-spacing:.28em;color:var(--ink)}
 </style>
 </head>
 <body>
 
 <div id="loader"></div>
-<div id="brand">XRZENO</div>
+<!-- DRAWER (was the static #brand) — corner menu / escape hatch -->
+<button id="drawerCtl" aria-expanded="false" aria-controls="drawer">XRZENO <span class="chev" aria-hidden="true"></span></button>
+<div id="scrim"></div>
+<nav id="drawer" aria-label="Site navigation">
+  <a href="#portfolio" data-nav="portfolio" data-i18n="drawer.portfolio">Portfolio</a>
+  <a href="#process"   data-nav="process"   data-i18n="drawer.process">How it works</a>
+  <a href="#faq"       data-nav="faq"        data-i18n="drawer.faq">FAQ</a>
+  <a href="#contact"   data-nav="contact"    data-i18n="drawer.contact">Contact</a>
+  <a href="#" class="d-lang" id="langToggle" data-i18n="drawer.lang">Bahasa Indonesia</a>
+  <a href="#" class="d-wa" id="drawerWA" target="_blank" rel="noopener" data-i18n="drawer.whatsapp">Chat on WhatsApp</a>
+</nav>
 
 <div id="track">
   <div id="stage"><canvas id="gl"></canvas></div>
@@ -82,6 +160,99 @@
 
 <div id="hint">Pinch to materialize</div>
 <div id="toast"></div>
+
+<!-- ===== SITE BODY (ported from desktop) — normal flow below the hero; the pinch-gate scrolls into it ===== -->
+<div id="siteBody">
+<section class="sect" id="compare">
+  <div class="wrap">
+    <div class="eyebrow" data-i18n="compare.eyebrow">Real vs Render</div>
+    <h2 data-i18n="compare.title">One of these is a photograph.</h2>
+    <p class="lede" data-i18n="compare.body">Every model we deliver starts as the physical product on our scanner.</p>
+    <div class="cmp" id="cmp" style="--x:50%">
+      <div class="layer ph-render" aria-hidden="true"></div>
+      <div class="layer ph-real top" aria-hidden="true"></div>
+      <div class="bar" aria-hidden="true"></div>
+      <span class="tag l" data-i18n="compare.labelReal">Photo</span>
+      <span class="tag r" data-i18n="compare.labelRender">Render</span>
+      <input type="range" min="0" max="100" value="50" step="0.1" aria-label="Photo / render divider">
+    </div>
+  </div>
+</section>
+
+<section class="sect" id="portfolio">
+  <div class="wrap">
+    <div class="eyebrow" data-i18n="portfolio.eyebrow">Portfolio</div>
+    <h2 data-i18n="portfolio.title">Built from real products.</h2>
+    <p class="lede" data-i18n="portfolio.body">Drag to rotate. Open on your phone to place any of these in your space at true size.</p>
+    <div class="cards">
+      <div class="card">
+        <model-viewer src="shinobu_2k_ar.glb" ios-src="shinobu_2k_ar.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
+          exposure="0.9" shadow-intensity="1" interaction-prompt="none" alt="Shinobu whisky bottle"></model-viewer>
+        <h3>Shinobu — whisky bottle</h3>
+        <p>Photogrammetry · glass + label rebuild</p>
+        <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
+      </div>
+      <div class="card">
+        <model-viewer src="ASSET_2.glb" ios-src="ASSET_2.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
+          exposure="0.9" shadow-intensity="1" alt="Product 2"></model-viewer>
+        <h3>Asset 2 — title</h3>
+        <p>One-line craft note</p>
+        <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
+      </div>
+      <div class="card">
+        <model-viewer src="ASSET_3.glb" ios-src="ASSET_3.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
+          exposure="0.9" shadow-intensity="1" alt="Product 3"></model-viewer>
+        <h3>Asset 3 — title</h3>
+        <p>One-line craft note</p>
+        <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sect" id="process">
+  <div class="wrap">
+    <div class="eyebrow" data-i18n="process.eyebrow">How it works</div>
+    <h2 data-i18n="process.title">Scan. Rebuild. Deliver.</h2>
+    <div class="steps">
+      <div class="step"><h3 data-i18n="process.step1.title">Scan</h3><p data-i18n="process.step1.body"></p></div>
+      <div class="step"><h3 data-i18n="process.step2.title">Rebuild</h3><p data-i18n="process.step2.body"></p></div>
+      <div class="step"><h3 data-i18n="process.step3.title">Deliver</h3><p data-i18n="process.step3.body"></p></div>
+    </div>
+    <p class="note" data-i18n="process.note"></p>
+  </div>
+</section>
+
+<section class="sect" id="faq">
+  <div class="wrap faq">
+    <div class="eyebrow" data-i18n="faq.eyebrow">FAQ</div>
+    <h2 data-i18n="faq.title">Common questions</h2>
+    <details><summary data-i18n="faq.q1"></summary><p data-i18n="faq.a1"></p></details>
+    <details><summary data-i18n="faq.q2"></summary><p data-i18n="faq.a2"></p></details>
+    <details><summary data-i18n="faq.q3"></summary><p data-i18n="faq.a3"></p></details>
+    <details><summary data-i18n="faq.q4"></summary><p data-i18n="faq.a4"></p></details>
+    <details><summary data-i18n="faq.q5"></summary><p data-i18n="faq.a5"></p></details>
+    <details><summary data-i18n="faq.q6"></summary><p data-i18n="faq.a6"></p></details>
+  </div>
+</section>
+
+<section class="sect cta" id="contact">
+  <div class="wrap">
+    <h2 data-i18n="cta.title">Show your product, not a picture of it.</h2>
+    <p class="lede" data-i18n="cta.body">Tell us what you make.</p>
+    <div class="btnrow">
+      <a class="btn btn-wa" id="ctaWA" href="#" data-i18n="cta.whatsapp">Chat on WhatsApp</a>
+      <a class="btn btn-mail" href="mailto:hello@xrzeno.com" data-i18n="cta.email">Email us</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span class="fb">XRZENO</span>
+  <span data-i18n="footer.tagline">WebAR & product visualization</span>
+  <span><a href="/privacy" data-i18n="footer.privacy">Privacy</a> · <span data-i18n="footer.rights">© XRZENO</span></span>
+</footer>
+</div><!-- /#siteBody -->
 
 <script type="importmap">
 { "imports": {
@@ -409,6 +580,7 @@ const hintEl = document.getElementById('hint');
 let scrollUnlocked=false, unlockTimer=null;
 function unlockScroll(){ scrollUnlocked=true; unlockTimer=null; document.body.classList.add('unlocked'); }
 function relockScroll(){ if(unlockTimer){ clearTimeout(unlockTimer); unlockTimer=null; } if(scrollUnlocked && scrollY<5){ scrollUnlocked=false; document.body.classList.remove('unlocked'); } }
+window.__unlock = ()=>{ if(!scrollUnlocked){ scrollUnlocked=true; document.body.classList.add('unlocked'); } };  // drawer escape hatch: release the pinch-gate on demand
 
 function loop(){
   if(!isMobile) targetF = scrollProgress(); // desktop: scroll drives form. mobile: pinch sets targetF.
@@ -453,6 +625,38 @@ addEventListener('resize',()=>{
   composer.setSize(W,H);
 });
 loop();
+</script>
+
+<!-- ===== SITE BODY behaviors: i18n copy swap + compare slider + drawer ===== -->
+<script>
+  const WA_NUMBER='6282342736941';
+  let bodyLang = /[?&]lang=id/.test(location.search) ? 'id' : 'en';
+  function applyLang(){
+    const S = (window.XR_STRINGS||{})[bodyLang]; if(!S) return;
+    document.querySelectorAll('[data-i18n]').forEach(el=>{ const s=S[el.dataset.i18n]; if(s) el.textContent=s; });
+    document.documentElement.lang = bodyLang;
+    const wa='https://wa.me/'+WA_NUMBER+'?text='+encodeURIComponent(S['cta.waPrefill']||'');
+    const c=document.getElementById('ctaWA'); if(c) c.href=wa;
+    const d=document.getElementById('drawerWA'); if(d) d.href=wa;
+  }
+  applyLang();
+  const cmpEl=document.getElementById('cmp');
+  if(cmpEl) cmpEl.querySelector('input').addEventListener('input', e=> cmpEl.style.setProperty('--x', e.target.value+'%'));
+
+  // ---- drawer (nav / escape hatch) — mobile uses native anchor scroll, and releases the pinch-gate on nav ----
+  const ctl=document.getElementById('drawerCtl'), drawer=document.getElementById('drawer'), scrim=document.getElementById('scrim');
+  function setDrawer(open){ drawer.classList.toggle('open',open); scrim.classList.toggle('on',open); ctl.setAttribute('aria-expanded',open); }
+  ctl.addEventListener('click', ()=> setDrawer(!drawer.classList.contains('open')));
+  scrim.addEventListener('click', ()=> setDrawer(false));
+  addEventListener('keydown', e=>{ if(e.key==='Escape') setDrawer(false); });
+  drawer.querySelectorAll('a[data-nav]').forEach(a=> a.addEventListener('click', e=>{
+    e.preventDefault(); setDrawer(false);
+    if(window.__unlock) window.__unlock();                    // let the impatient user skip the hero
+    const t=document.getElementById(a.dataset.nav);
+    if(t) requestAnimationFrame(()=> t.scrollIntoView({behavior:'smooth',block:'start'}));
+  }));
+  const dwa=document.getElementById('drawerWA'); if(dwa) dwa.addEventListener('click', ()=> setDrawer(false));
+  const lt=document.getElementById('langToggle'); if(lt) lt.addEventListener('click', e=>{ e.preventDefault(); bodyLang = bodyLang==='en'?'id':'en'; applyLang(); });
 </script>
 </body>
 </html>
