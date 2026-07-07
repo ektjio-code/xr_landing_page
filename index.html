@@ -29,12 +29,9 @@
   #gl{display:block;width:100%;height:100%;}
   /* MOBILE (touch): no scrolling — a pinch drives the form. Single fixed viewport. */
   @media (pointer:coarse){
-    body{overflow:hidden;}                     /* scroll LOCKED until the bottle is pinch-formed */
-    body.unlocked{overflow-y:auto;overflow-x:hidden;}  /* pinch-formed → release: the body below is now reachable */
+    body{overflow:hidden;}          /* the hero never scrolls — pinch forms, 1-finger rotates, no scroll/camera conflict. Entry to the site is a TAP. */
     #track{height:100vh;}
-    #stage{touch-action:none;}                 /* capture pinch/drag; suppress native scroll + pinch-zoom */
-    body.unlocked #stage{touch-action:pan-y;}  /* vertical drag scrolls into the body; horizontal still spins the hero */
-    body.unlocked #ar{opacity:0;pointer-events:none;}  /* hero AR button retires once you scroll into the site */
+    #stage{touch-action:none;}      /* capture pinch/drag; suppress native scroll + pinch-zoom */
   }
 
   /* CTA / AR button */
@@ -49,6 +46,11 @@
   #hint{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:40;
     color:var(--muted);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
     animation:fade 2.6s infinite;transition:opacity .4s;}
+  /* "Tap to explore" — sits below the AR button, appears once the bottle is formed; tapping runs the blur-into-site transition */
+  #explore{position:fixed;bottom:3.4%;left:50%;transform:translateX(-50%);z-index:31;
+    color:var(--ink);font-size:12px;letter-spacing:.2em;text-transform:uppercase;
+    opacity:0;pointer-events:none;transition:opacity .5s;cursor:pointer;}
+  #explore.show{opacity:.85;pointer-events:auto;}
   @keyframes fade{0%,100%{opacity:.3}50%{opacity:.8}}
 
   #loader{position:fixed;inset:0;z-index:60;background:var(--stage);display:flex;
@@ -79,7 +81,7 @@
   #drawerCtl{position:fixed;top:15px;left:18px;z-index:100;display:flex;align-items:center;gap:8px;background:none;border:0;cursor:pointer;color:#f0ece4;font-family:'Montserrat',system-ui,sans-serif;font-size:12px;letter-spacing:.26em;font-weight:700;padding:8px}
   #drawerCtl .chev{display:inline-block;border:solid #ff8a3d;border-width:0 2px 2px 0;padding:3px;transform:rotate(45deg) translateY(-2px);transition:transform .25s}
   #drawerCtl[aria-expanded="true"] .chev{transform:rotate(-135deg) translateY(-2px)}
-  #drawer{position:fixed;top:0;left:0;z-index:99;height:100vh;width:min(280px,84vw);background:rgba(18,34,82,.42);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-right:1px solid rgba(120,150,255,.28);padding:84px 30px 30px;display:flex;flex-direction:column;gap:4px;transform:translateX(-102%);transition:transform .35s cubic-bezier(.3,.9,.3,1)}
+  #drawer{position:fixed;top:0;left:0;z-index:99;height:100dvh;overflow-y:auto;width:min(280px,84vw);background:rgba(18,34,82,.42);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-right:1px solid rgba(120,150,255,.28);padding:84px 30px calc(28px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:4px;transform:translateX(-102%);transition:transform .35s cubic-bezier(.3,.9,.3,1)} /* 100dvh + safe-area so the WhatsApp button never clips under the browser bar */
   #drawer.open{transform:translateX(0)}
   #drawer a{color:#eaf1ff;text-decoration:none;font-family:'Montserrat',system-ui,sans-serif;font-weight:700;font-size:16px;letter-spacing:.05em;padding:9px 0;border-bottom:1px solid rgba(150,180,255,.14);transition:color .2s}
   #drawer .d-wa{margin-top:auto;background:#ff8a3d;color:#1a0e04;border:1px solid #ff8a3d;border-bottom:1px solid #ff8a3d;border-radius:100px;text-align:center;padding:13px;font-size:14px} /* SAME as the bottom CTA */
@@ -87,9 +89,16 @@
   #scrim{position:fixed;inset:0;z-index:98;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s}
   #scrim.on{opacity:1;pointer-events:auto}
   :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-  #siteBody{position:relative;z-index:3;background:#070b16;color:var(--ink);text-shadow:0 2px 18px rgba(0,0,0,.55);
+  /* The site is a FIXED overlay that BLURS INTO VIEW over the defocused hero on "Tap to explore", then owns scrolling (3D gets disabled behind it). */
+  #siteBody{position:fixed;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;z-index:3;background:#070b16;color:var(--ink);text-shadow:0 2px 18px rgba(0,0,0,.55);
+    opacity:0;pointer-events:none;filter:blur(18px);transition:opacity .9s ease,filter .9s ease;
     /* MONTURE COLD PALETTE — scoped to the site; the warm hero above keeps its own tokens */
     --ink:#eaf1ff; --muted:#93a4c7; --accent:#1e40ff; --warm:#ff8a3d; --bg-deep:#0a1633; --hairline:rgba(150,180,255,.14); --navy:#0a1633;}
+  body.entering #siteBody{opacity:1;filter:blur(0)}      /* website blurs into view */
+  body.entered  #siteBody{pointer-events:auto}           /* once settled it owns scrolling */
+  #stage{transition:filter .9s ease}
+  body.entering #stage{filter:blur(28px)}                /* the 3D defocuses behind the resolving site */
+  body.entering #ar, body.entering #hint, body.entering #explore{opacity:0;pointer-events:none}
   .sect{position:relative;z-index:2;background:transparent;padding:clamp(72px,11vh,130px) 6vw;border-top:1px solid var(--hairline)}
   #compare{border-top:none}
   .wrap{max-width:1060px;margin:0 auto}
@@ -157,6 +166,7 @@
 <div id="ar">
   <button id="arBtn">View in your space</button>
 </div>
+<div id="explore" role="button" tabindex="0">Tap to explore</div>
 
 <div id="hint">Pinch to materialize</div>
 <div id="toast"></div>
@@ -575,12 +585,17 @@ function setForm(f){
   points.visible = meshIn < 1; // hard-hide once fully formed — no stray dots on or around the mesh
 }
 
-// ---- Stage 1: pinch-gate → scroll-unlock. Once formed (curF≈0.98), a 600ms guard then release the page scroll so the body below is reachable. Reversible: disperse back at the top re-locks. ----
-const hintEl = document.getElementById('hint');
-let scrollUnlocked=false, unlockTimer=null;
-function unlockScroll(){ scrollUnlocked=true; unlockTimer=null; document.body.classList.add('unlocked'); }
-function relockScroll(){ if(unlockTimer){ clearTimeout(unlockTimer); unlockTimer=null; } if(scrollUnlocked && scrollY<5){ scrollUnlocked=false; document.body.classList.remove('unlocked'); } }
-window.__unlock = ()=>{ if(!scrollUnlocked){ scrollUnlocked=true; document.body.classList.add('unlocked'); } };  // drawer escape hatch: release the pinch-gate on demand
+// ---- Mobile handoff: pinch to form → "Tap to explore" → the website BLURS INTO VIEW over the defocused hero → 3D disabled ----
+const hintEl = document.getElementById('hint'), exploreEl = document.getElementById('explore');
+let entering=false, live3D=true;
+function enterSite(){
+  if(entering) return; entering=true;
+  if(exploreEl) exploreEl.classList.remove('show');
+  document.body.classList.add('entering');                 // CSS: hero defocuses, site blurs in, hero prompts fade
+  setTimeout(()=>{ document.body.classList.add('entered'); live3D=false; }, 950); // site is in → disable the 3D loop
+}
+if(exploreEl) exploreEl.addEventListener('click', enterSite);
+window.__enter = enterSite;                                 // drawer nav triggers the same transition
 
 function loop(){
   if(!isMobile) targetF = scrollProgress(); // desktop: scroll drives form. mobile: pinch sets targetF.
@@ -603,11 +618,9 @@ function loop(){
 
   // UI
   toggleEl(document.getElementById('ar'), curF>0.85);
-  if(isMobile){                                          // pinch-gate → scroll-unlock
-    if(curF>0.98){ if(!scrollUnlocked && unlockTimer===null) unlockTimer=setTimeout(unlockScroll,600); }
-    else if(curF<0.9) relockScroll();
-    hintEl.textContent = scrollUnlocked ? 'Scroll to explore ↓' : 'Pinch to materialize';
-    hintEl.style.opacity = (scrollUnlocked || curF<0.04) ? '' : '0';
+  if(isMobile){
+    if(!entering && exploreEl) exploreEl.classList.toggle('show', curF>0.98); // "Tap to explore" once formed
+    hintEl.style.opacity = curF<0.04 ? '' : '0';           // "Pinch to materialize" fades once pinching starts
   } else {
     hintEl.style.opacity = curF>0.04?'0':'';
   }
@@ -615,6 +628,7 @@ function loop(){
   // Always render through the composer — glass is plain alpha (not transmission), so no need to bypass
   // it, and NOT switching render paths avoids a full material recompile (that was the formation stutter).
   composer.render();
+  if(!live3D) return;                                       // website is in → stop the 3D render loop (perf)
   requestAnimationFrame(loop);
 }
 function toggleEl(e,on){ if(e) e.classList.toggle('show',on);}
@@ -651,9 +665,9 @@ loop();
   addEventListener('keydown', e=>{ if(e.key==='Escape') setDrawer(false); });
   drawer.querySelectorAll('a[data-nav]').forEach(a=> a.addEventListener('click', e=>{
     e.preventDefault(); setDrawer(false);
-    if(window.__unlock) window.__unlock();                    // let the impatient user skip the hero
+    if(window.__enter) window.__enter();                      // run the blur-into-site transition (escape hatch for the impatient)
     const t=document.getElementById(a.dataset.nav);
-    if(t) requestAnimationFrame(()=> t.scrollIntoView({behavior:'smooth',block:'start'}));
+    if(t) requestAnimationFrame(()=> t.scrollIntoView({block:'start'})); // land at the section as the site resolves in
   }));
   const dwa=document.getElementById('drawerWA'); if(dwa) dwa.addEventListener('click', ()=> setDrawer(false));
   const lt=document.getElementById('langToggle'); if(lt) lt.addEventListener('click', e=>{ e.preventDefault(); bodyLang = bodyLang==='en'?'id':'en'; applyLang(); });
