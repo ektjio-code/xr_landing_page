@@ -828,6 +828,22 @@ window.__nav = (id)=>{ const t=document.getElementById(id); if(!t) return;
   if(bodyLocked){ siteBodyEl.scrollTo({top:Math.max(0,t.offsetTop-14), behavior:'smooth'}); }
   else { pendingSection=id; window.scrollTo({top: document.documentElement.scrollHeight - innerHeight, behavior:'smooth'}); } };
 
+// ===== MOUSE PARALLAX (Step 7) =====
+// A tiny ±2.5° lean on TOP of the rail pose — the antidote to the "on-rails" feel. Stateless: recomputed each frame from the (damped) mouse and the pure rail pose, so it never accumulates into camera state → reversibility intact. Eased out into the finale so the money shot stays steady.
+const PARALLAX = 2.5*Math.PI/180;
+let mtx=0, mty=0, pmx=0, pmy=0;              // target mouse (-1..1) + damped
+addEventListener('pointermove', e=>{ mtx=(e.clientX/innerWidth)*2-1; mty=(e.clientY/innerHeight)*2-1; });
+const _UP=new THREE.Vector3(0,1,0), _pOff=new THREE.Vector3(), _pRight=new THREE.Vector3();
+function applyParallax(scale){               // orbits the camera a hair around controls.target (subject stays centred)
+  pmx += (mtx-pmx)*0.06; pmy += (mty-pmy)*0.06;
+  const a = PARALLAX*scale; if(a<1e-5) return;
+  _pOff.copy(camera.position).sub(controls.target);
+  _pOff.applyAxisAngle(_UP, -pmx*a);
+  _pRight.crossVectors(_pOff,_UP).normalize();
+  _pOff.applyAxisAngle(_pRight, pmy*a);
+  camera.position.copy(controls.target).add(_pOff);
+}
+
 function loop(){
   if(!isMobile && !inspectMode) targetF = splitProgress();   // desktop scroll drives form; frozen while inspecting
   curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
@@ -876,6 +892,7 @@ function loop(){
     railPose(curJ);
     camera.position.copy(_railPos);
     controls.target.copy(_railTgt);
+    applyParallax(1 - smoothstep(clamp((curJ-0.82)/0.18)));  // full lean through the journey, eased to 0 into the #5 pull-back/finale
     camera.lookAt(controls.target);
     setJourneyMaterial(curJ);                        // Step 3: clay → final, in lockstep with the camera
     updateBeats(curJ);                               // Step 4: pinned beat text + finale
