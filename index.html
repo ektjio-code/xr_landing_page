@@ -699,10 +699,10 @@ loop();
   // ---- body life: reveal each section/card/step as it scrolls into the site ----
   (function(){
     const root=document.getElementById('siteBody'); if(!root || !('IntersectionObserver' in window)) return;
-    const items=[...root.querySelectorAll('.eyebrow,h2,.lede,.cmp,.card,.step,.faq details,.btnrow,.note,footer .fb,footer span')];
+    const items=[...root.querySelectorAll('.eyebrow,h2,.cmp,.card,.step,.faq details,.btnrow,footer .fb,footer span')];   // Ed 2026-07-08: only the TEXT blurbs (.lede + .note) stay STATIC; header, subheader + every other element keep their reveal
     items.forEach(el=>el.classList.add('reveal'));
     root.querySelectorAll('.cards>.card,.steps>.step').forEach(el=>{ el.style.transitionDelay=([...el.parentNode.children].indexOf(el)*90)+'ms'; });
-    const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }),{threshold:0.14,rootMargin:'0px 0px -12% 0px'}); // viewport root: #siteBody is a fixed viewport-sized layer, so children's viewport rects change as it scrolls internally (works on desktop scroll-lock + mobile)
+    const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }),{threshold:0.14,rootMargin:'0px 0px -12% 0px'}); // viewport root: #siteBody is a fixed viewport-sized layer, so children's viewport rects change as it scrolls internally
     items.forEach(el=>io.observe(el));
   })();
 </script>

@@ -130,12 +130,35 @@
   footer{position:relative;z-index:2;background:transparent;border-top:1px solid var(--hairline);padding:34px 6vw;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
   footer a{color:var(--muted);text-decoration:none} footer a:hover{color:var(--accent)}
   footer .fb{font-family:var(--disp);font-weight:700;letter-spacing:.28em;color:var(--ink)}
-  /* body life: reveal-on-scroll + card hover-lift (so the site doesn't go flat after the hero) */
-  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  /* ===== BODY MOTION SYSTEM (Lusion pass): word-assembly + decode headings, scroll-velocity shear, springy staggered reveals, magnetic buttons — one SOD primitive ===== */
+  .reveal{opacity:0;transform:translateY(40px) scale(.982);transition:opacity .85s cubic-bezier(.2,.7,.2,1),transform 1s cubic-bezier(.2,1.14,.32,1)}   /* springy overshoot, not a flat fade */
   .reveal.in{opacity:1;transform:none}
-  .card.reveal{transition:opacity .6s ease,transform .45s cubic-bezier(.2,.7,.2,1),border-color .35s,box-shadow .35s}
-  .card:hover{transform:translateY(-5px);border-color:rgba(120,150,255,.4);box-shadow:0 18px 50px rgba(0,0,0,.45)}
-  @media (prefers-reduced-motion:reduce){ .reveal{opacity:1 !important;transform:none !important;transition:none} }
+  .card.reveal{transition:opacity .7s ease,transform .85s cubic-bezier(.2,1.14,.32,1),border-color .35s,box-shadow .35s}
+  .card{transition:transform .4s cubic-bezier(.2,1.2,.36,1),border-color .35s,box-shadow .35s}
+  .card:hover{transform:translateY(-6px) scale(1.012);border-color:rgba(120,150,255,.45);box-shadow:0 22px 60px rgba(0,0,0,.5)}
+  /* scroll-velocity shear REMOVED — it lived in the dead zone (too subtle to read as intentional, present enough to nudge vertigo, no payoff). The decode + word-rise carry the life. */
+  /* word-rise text assembly — each word rises out of a clip mask, staggered */
+  .w-split .wm{ display:inline-block; overflow:hidden; vertical-align:top; padding:0 .01em; }
+  .w-split .wi{ display:inline-block; transform:translateY(118%); }
+  .w-split.in-words .wi{ transform:none; transition:transform .95s cubic-bezier(.16,1,.3,1); }
+  /* magnetic buttons lean toward the cursor + spring back */
+  .btn,.arb,#drawerCtl{ will-change:transform }
+  @media (prefers-reduced-motion:reduce){ .reveal,.w-split .wi{opacity:1 !important;transform:none !important;transition:none} #siteBody .eyebrow,#siteBody h2{transform:none} }
+
+  /* ===== DRAMATIC LAYER (Lusion, cranked — no more subtlety) ===== */
+  #liquidBg{position:fixed;inset:0;z-index:2;opacity:0;pointer-events:none;filter:blur(46px) saturate(1.35)}   /* blur melts the blobs into liquid metaballs */
+  /* (custom cursor removed per feedback — native cursor stays) */
+  /* fluid headings — words flow up out of the mask with a blur-clear + soft overshoot settle */
+  .w-split .wi{ transform:translateY(125%) rotate(9deg); transform-origin:0% 100%; filter:blur(7px); }
+  .w-split.in-words .wi{ transform:none; filter:none; transition:transform 1.2s cubic-bezier(.2,.9,.2,1.06), filter .8s ease; }   /* blur-clear + soft overshoot = liquid, not rigid */
+  /* dramatic reveals — cards fly in from alternating sides, rotate + scale; steps rise & tilt */
+  .reveal{opacity:0;transform:translateY(64px) scale(.92);transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform 1.1s cubic-bezier(.2,1.18,.34,1)}
+  .cards{perspective:1200px}
+  .cards>.card.reveal:nth-child(odd){transform:translate(-90px,46px) rotate(-6deg) scale(.88)}
+  .cards>.card.reveal:nth-child(even){transform:translate(90px,46px) rotate(6deg) scale(.88)}
+  .steps>.step.reveal:nth-child(odd){transform:translateY(74px) rotate(-4deg) scale(.9)}
+  .steps>.step.reveal:nth-child(even){transform:translateY(74px) rotate(4deg) scale(.9)}
+  .reveal.in{opacity:1 !important;transform:none !important}
 </style>
 </head>
 <body>
@@ -175,7 +198,8 @@
 </div>
 <div id="toast"></div>
 
-<!-- ===== SITE BODY (concept skeleton) — the fixed, blurred, cold scene is its background; content fades in over it ===== -->
+<canvas id="liquidBg" aria-hidden="true"></canvas>
+<!-- ===== SITE BODY (concept skeleton) — living liquid backdrop; content flies in over it ===== -->
 <div id="siteBody">
 <section class="sect" id="compare">
   <div class="wrap">
@@ -787,8 +811,28 @@ const beatScan = document.getElementById('beatScan'), beatRebuild = document.get
 const coolVeilEl = document.getElementById('coolVeil'), siteBodyEl = document.getElementById('siteBody');   // canvas-release: blue wash + the site content that fades in
 const beatLead = document.getElementById('beatLead'), beatBrand = document.getElementById('beatBrand');
 const beatSharp = beatBrand.querySelector('.d-sharp'), beatBlur = beatBrand.querySelector('.d-blur');
+
+// ===== SecondOrderDynamics — Lusion's site-wide motion primitive (robust t3ssel8r variant, verbatim shape from their bundle; stays stable at any framerate) =====
+class SOD{ constructor(v,f,z,r){ this._w=2*Math.PI*f; this._z=z; this._d=this._w*Math.sqrt(Math.abs(z*z-1));
+    this.k1=z/(Math.PI*f); this.k2=1/(this._w*this._w); this.k3=r*z/this._w; this.x=v.slice(); this.y=v.slice(); this.yd=v.map(()=>0); }
+  update(dt,t){ let k1,k2;
+    if(this._w*dt<this._z){ k1=this.k1; k2=Math.max(this.k2, dt*dt/2+dt*this.k1/2, dt*this.k1); }                       // stable region → dt-clamp
+    else { const e=Math.exp(-this._z*this._w*dt), c=2*e*(this._z<=1?Math.cos(dt*this._d):Math.cosh(dt*this._d)), n=e*e, a=dt/(1+n-c); k1=(1-n)*a; k2=dt*a; } // stiff/underdamped → exact closed form
+    for(let i=0;i<this.y.length;i++){ const xd=(t[i]-this.x[i])/dt; this.x[i]=t[i]; this.y[i]+=dt*this.yd[i]; this.yd[i]+=dt*(t[i]+this.k3*xd-this.y[i]-k1*this.yd[i])/k2; } } }
+
+// ===== MATRIX DECODE — the process words resolve out of glyph-noise, L→R. XRZENO's pitch (Scan→Rebuild→Deliver = reconstruction) made kinetic. Presence-driven → fully reversible on scroll. =====
+const DEC_GLY='ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%*<>/';
+function mkDecode(el){ const t=(el.textContent||'').trim(); el.style.whiteSpace='nowrap'; return { el, t, rnd:new Array(t.length).fill('#'), roll:0, prev:null }; }
+function drawDecode(d, reveal, now){
+  const L=d.t.length, solid=Math.round(Math.max(0,Math.min(1,reveal))*L);                       // resolved chars, L→R
+  if(now-d.roll>45){ d.roll=now; for(let i=0;i<L;i++) d.rnd[i]=DEC_GLY[(Math.random()*DEC_GLY.length)|0]; } // throttle glyph flicker to a chunky ~22/s terminal feel
+  let s=''; for(let i=0;i<L;i++) s += d.t[i]===' ' ? ' ' : (i<solid ? d.t[i] : d.rnd[i]);
+  if(s!==d.prev){ d.el.textContent=s; d.prev=s; }
+}
+const decScan=mkDecode(beatScan), decReb=mkDecode(beatRebuild), decLead=mkDecode(beatLead);
+console.log('%c XRZENO · motion+decode build live ','background:#101f3d;color:#7ea8ff;padding:3px 10px;border-radius:4px;font-weight:700'); // freshness marker — if you don't see this in the console, you're on a cached build
 function beatBand(x,a,b,c,d){ if(x<=a||x>=d) return 0; if(x<b) return (x-a)/(b-a); if(x>c) return (d-x)/(d-c); return 1; } // 0→1→hold→1→0
-function showBeat(el,pres){ const o = Math.min(1, pres*3); el.style.opacity = o; el.style.filter = o>0.001 ? 'blur('+((1-pres)*24).toFixed(2)+'px)' : 'none'; } // opacity rushes ahead of blur → focus-pull, not a fade
+function showBeat(el,pres){ const o = Math.min(1, pres*3); el.style.opacity = o; el.style.filter = o>0.001 ? 'blur('+((1-pres)*4).toFixed(2)+'px)' : 'none'; } // blur cut 24→4: the DECODE is now the materialize (heavy blur was masking the glyph churn); opacity still rushes ahead
 function updateBrand(p){                                        // XRZENO: appears LAST, SLOW time-eased focus-pull L→R, FLAT once settled (no halo)
   const target = p > 0.92 ? 1 : 0;                             // engage once the camera is essentially parked at #5
   xrReveal += (target - xrReveal) * 0.018;                     // slow classy ease (both in and out) — not scroll-rushed
@@ -801,11 +845,15 @@ function updateBrand(p){                                        // XRZENO: appea
   beatBlur.style.webkitMaskImage  = mBlur;  beatBlur.style.maskImage  = mBlur;
 }
 function updateBeats(p){
-  showBeat(beatScan,    beatBand(p, 0.02, 0.10, 0.16, 0.24));  // #4 opening (clay just formed)
-  showBeat(beatRebuild, beatBand(p, 0.30, 0.40, 0.50, 0.60));  // #2 → #3 (clay resolves, red mask reads)
+  const now = performance.now();
+  const bScan = beatBand(p, 0.02, 0.10, 0.16, 0.24);           // #4 opening (clay just formed)
+  const bReb  = beatBand(p, 0.30, 0.40, 0.50, 0.60);           // #2 → #3 (clay resolves, red mask reads)
+  showBeat(beatScan, bScan);     drawDecode(decScan, bScan, now);   // Scan — decodes out of noise as it focuses in
+  showBeat(beatRebuild, bReb);   drawDecode(decReb, bReb, now);     // Rebuild — decodes
   updateBrand(p);                                              // XRZENO last (updates xrReveal), once the camera is settled
   deliverFade += ((xrReveal > 0.97 ? 1 : 0) - deliverFade) * 0.015;      // once XRZENO is formed, DELIVER slowly retires — no interaction
-  showBeat(beatLead, beatBand(p, 0.72, 0.84, 2, 3) * (1 - deliverFade)); // comes in on the pull-back, then auto-fades out
+  const bLead = beatBand(p, 0.72, 0.84, 2, 3) * (1 - deliverFade);       // comes in on the pull-back, then auto-fades out
+  showBeat(beatLead, bLead);     drawDecode(decLead, bLead, now);   // Deliver — decodes in, then dissolves back to noise as it retires
   beatScrim.style.opacity = (xrReveal * 0.45 * (1-bodyP)).toFixed(3);   // light scrim under the finale (also fades with the canvas release)
 }
 
@@ -841,7 +889,7 @@ let bodyLocked = false, pendingSection = null, rafPaused = false;
 function enterBodyLock(){ bodyLocked=true; document.documentElement.style.overflow='hidden'; document.body.style.overflow='hidden';
   const t = pendingSection && document.getElementById(pendingSection); pendingSection=null;
   siteBodyEl.scrollTop = t ? Math.max(0, t.offsetTop-14) : 0; }   // land on a drawer-requested section, else the top
-function exitBodyLock(){ if(!bodyLocked) return; bodyLocked=false; document.documentElement.style.overflow=''; document.body.style.overflow='';
+function exitBodyLock(){ if(!bodyLocked) return; bodyLocked=false; document.documentElement.style.overflow=''; document.body.style.overflow='';   // pulled up out of the site → play the narrative backward
   window.scrollTo(0, (trackEl.offsetHeight - innerHeight) + RAMP()*0.9);   // land at bodyP≈0.9 so the narrative eases back as they keep scrolling up
   if(rafPaused){ rafPaused=false; loop(); } }   // scene was frozen behind the site → wake the render loop
 window.addEventListener('wheel', e=>{ if(bodyLocked && siteBodyEl.scrollTop<=0 && e.deltaY<0){ e.preventDefault(); exitBodyLock(); } }, {passive:false});
@@ -852,21 +900,26 @@ window.__nav = (id)=>{ const t=document.getElementById(id); if(!t) return;
 
 // ===== MOUSE PARALLAX (Step 7) =====
 // A tiny ±2.5° lean on TOP of the rail pose — the antidote to the "on-rails" feel. Stateless: recomputed each frame from the (damped) mouse and the pure rail pose, so it never accumulates into camera state → reversibility intact. Eased out into the finale so the money shot stays steady.
+// Now SPRINGY: the lean anticipates + settles on a SecondOrderDynamics (Lusion's own eased-mouse constants) instead of a flat exponential damp — the "one physics of response" that reads as hand-made.
 const PARALLAX = 2.5*Math.PI/180;
-let mtx=0, mty=0, pmx=0, pmy=0;              // target mouse (-1..1) + damped
-addEventListener('pointermove', e=>{ mtx=(e.clientX/innerWidth)*2-1; mty=(e.clientY/innerHeight)*2-1; });
+let mtx=0, mty=0; const _mTarget=[0,0];      // target mouse (-1..1)
+const mouseSpring = new SOD([0,0], 1.35, 0.55, 1.2);   // f/ζ/r — Lusion default eased-input (ζ nudged 0.5→0.55 so a 2.5° camera lean settles without a queasy ring). TUNING KNOB.
+addEventListener('pointermove', e=>{ mtx=(e.clientX/innerWidth)*2-1; mty=(e.clientY/innerHeight)*2-1; _mTarget[0]=mtx; _mTarget[1]=mty; });
 const _UP=new THREE.Vector3(0,1,0), _pOff=new THREE.Vector3(), _pRight=new THREE.Vector3();
-function applyParallax(scale){               // orbits the camera a hair around controls.target (subject stays centred)
-  pmx += (mtx-pmx)*0.06; pmy += (mty-pmy)*0.06;
-  const a = PARALLAX*scale; if(a<1e-5) return;
+function applyParallax(scale){               // reads the spring (ticked every frame in the loop); orbits camera a hair around controls.target (subject stays centred)
+  const a = PARALLAX*scale; if(Math.abs(a)<1e-5) return;
+  const px = mouseSpring.y[0], py = mouseSpring.y[1];
   _pOff.copy(camera.position).sub(controls.target);
-  _pOff.applyAxisAngle(_UP, -pmx*a);
+  _pOff.applyAxisAngle(_UP, -px*a);
   _pRight.crossVectors(_pOff,_UP).normalize();
-  _pOff.applyAxisAngle(_pRight, pmy*a);
+  _pOff.applyAxisAngle(_pRight, py*a);
   camera.position.copy(controls.target).add(_pOff);
 }
+let _pLast = performance.now();              // dt clock for the springs
 
 function loop(){
+  const _now = performance.now(); let _dt = (_now - _pLast)/1000; _pLast = _now; _dt = _dt>0 ? Math.min(_dt, 1/30) : 1/60;
+  mouseSpring.update(_dt, _mTarget);                          // parallax spring ticks every frame → never jumps when re-entering the journey
   if(!isMobile && !inspectMode) targetF = splitProgress();   // desktop scroll drives form; frozen while inspecting
   curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
   curJ += (journeyP-curJ)*0.1; if(Math.abs(journeyP-curJ)<0.0004) curJ=journeyP;   // damped, but the pose is read from curJ → reversible
@@ -982,14 +1035,68 @@ loop();
   const dwa=document.getElementById('drawerWA'); if(dwa) dwa.addEventListener('click', ()=> setDrawer(false));
   const lt=document.getElementById('langToggle'); if(lt) lt.addEventListener('click', e=>{ e.preventDefault(); bodyLang = bodyLang==='en'?'id':'en'; applyLang(); });
 
-  // ---- body life: reveal each section/card/step as it scrolls into the site ----
+  // ===== BODY MOTION SYSTEM — turn the DOM body into a living, Lusion-grade page: word-assembly + decode headings, scroll-velocity shear, springy staggered reveals, magnetic buttons — all on one SOD primitive =====
   (function(){
-    const root=document.getElementById('siteBody'); if(!root || !('IntersectionObserver' in window)) return;
-    const items=[...root.querySelectorAll('.eyebrow,h2,.lede,.cmp,.card,.step,.faq details,.btnrow,.note,footer .fb,footer span')];
-    items.forEach(el=>el.classList.add('reveal'));
+    const root=document.getElementById('siteBody'); if(!root) return;
+    const SHOWALL=()=>root.querySelectorAll('.eyebrow,.lede,.cmp,.card,.step,.faq details,.btnrow,.note,footer .fb,footer span').forEach(el=>el.style.opacity=1);
+    if(matchMedia('(prefers-reduced-motion:reduce)').matches || !('IntersectionObserver' in window)){ SHOWALL(); return; }
+
+    class SOD{ constructor(v,f,z,r){ this._w=2*Math.PI*f;this._z=z;this._d=this._w*Math.sqrt(Math.abs(z*z-1));this.k1=z/(Math.PI*f);this.k2=1/(this._w*this._w);this.k3=r*z/this._w;this.x=v.slice();this.y=v.slice();this.yd=v.map(()=>0);}
+      update(dt,t){let k1,k2; if(this._w*dt<this._z){k1=this.k1;k2=Math.max(this.k2,dt*dt/2+dt*this.k1/2,dt*this.k1);} else {const e=Math.exp(-this._z*this._w*dt),c=2*e*(this._z<=1?Math.cos(dt*this._d):Math.cosh(dt*this._d)),n=e*e,a=dt/(1+n-c);k1=(1-n)*a;k2=dt*a;} for(let i=0;i<this.y.length;i++){const xd=(t[i]-this.x[i])/dt;this.x[i]=t[i];this.y[i]+=dt*this.yd[i];this.yd[i]+=dt*(t[i]+this.k3*xd-this.y[i]-k1*this.yd[i])/k2;}}}
+
+    function splitWords(el){ const txt=(el.textContent||'').trim(); el.textContent=''; el.classList.add('w-split'); const wis=[], words=txt.split(/\s+/);   // wrap each word in a rising clip-mask
+      words.forEach((w,i)=>{ const wm=document.createElement('span'); wm.className='wm'; const wi=document.createElement('span'); wi.className='wi'; wi.textContent=w; wm.appendChild(wi); el.appendChild(wm); wis.push(wi); if(i<words.length-1) el.appendChild(document.createTextNode(' ')); });
+      return wis; }
+
+    const GLY='ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%*<>/', decoders=[];                      // matrix decode (time-based) for eyebrows
+    function startDecode(el){ if(decoders.some(d=>d.el===el)) return; const t=(el.textContent||'').trim(); el.style.whiteSpace='nowrap'; decoders.push({el,t,rnd:new Array(t.length).fill('#'),roll:0,t0:performance.now(),dur:640,prev:null}); }   // guard: no stacked decoders on re-entry
+
+    function setShown(el, on){
+      if(el.classList.contains('eyebrow')){ if(on){ el.style.opacity=1; startDecode(el); } else el.style.opacity=0; }                  // eyebrow → decode in / hide out
+      else if(el.tagName==='H2'){ el.classList.toggle('in-words', on); if(on && el._wis) el._wis.forEach((wi,i)=>wi.style.transitionDelay=(i*32)+'ms'); } // heading → words flow in / drop back out
+      else el.classList.toggle('in', on);                                                                     // everything else → reveal / re-hide
+    }
+    const io=new IntersectionObserver(es=>es.forEach(e=> setShown(e.target, e.isIntersecting) ),{threshold:0.12, rootMargin:'0px 0px -8% 0px'});  // REVERSIBLE: elements re-hide when scrolled back up, replay on the way down
+
+    // pre-hide everything now (so there's no flash when the body fades in)
+    const items=[];
+    root.querySelectorAll('h2').forEach(h=>{ h._wis=splitWords(h); items.push(h); });
+    root.querySelectorAll('.eyebrow').forEach(e=>{ e.style.opacity=0; items.push(e); });
+    const revs=[...root.querySelectorAll('.cmp,.card,.step,.faq details,.btnrow,footer .fb,footer span')];   // Ed 2026-07-08: only the TEXT blurbs (.lede + .note) stay STATIC; every other element — photos, cards, steps, FAQ, buttons, footer — keeps its reveal
+    revs.forEach(el=>el.classList.add('reveal'));
     root.querySelectorAll('.cards>.card,.steps>.step').forEach(el=>{ el.style.transitionDelay=([...el.parentNode.children].indexOf(el)*90)+'ms'; });
-    const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }),{threshold:0.14,rootMargin:'0px 0px -12% 0px'}); // viewport root: #siteBody is a fixed viewport-sized layer, so children's viewport rects change as it scrolls internally (works on desktop scroll-lock + mobile)
-    items.forEach(el=>io.observe(el));
+    items.push(...revs);
+
+    // language switch → applyLang rewrites textContent, so re-split + re-run the assembly
+    const lt2=document.getElementById('langToggle'); if(lt2) lt2.addEventListener('click', ()=> setTimeout(()=>{ decoders.length=0;
+      root.querySelectorAll('h2').forEach(h=>{ h._wis=splitWords(h); requestAnimationFrame(()=>{ h.classList.add('in-words'); h._wis.forEach((wi,i)=>wi.style.transitionDelay=(i*40)+'ms'); }); });
+      root.querySelectorAll('.eyebrow').forEach(e=>{ e.style.opacity=1; startDecode(e); });
+    }, 0));
+
+    // magnetic buttons — lean toward the cursor, spring back
+    [...root.querySelectorAll('.btn,.arb'), document.getElementById('drawerCtl')].filter(Boolean).forEach(b=>{
+      b.style.transition='transform .32s cubic-bezier(.22,1.2,.36,1)';
+      b.addEventListener('pointermove',e=>{ const r=b.getBoundingClientRect(); b.style.transform='translate('+((e.clientX-r.left-r.width/2)*0.5).toFixed(1)+'px,'+((e.clientY-r.top-r.height/2)*0.55).toFixed(1)+'px) scale(1.08)'; });
+      b.addEventListener('pointerleave',()=>{ b.style.transform=''; });
+    });
+
+    // per-frame: attach observers once the body is actually on screen (so section 1 animates on ENTRY, not silently at load), + scroll-velocity shear + decode churn
+    const skew=new SOD([0],2.0,1.1,0); let lastTop=root.scrollTop, lastT=performance.now(), attached=false;   // ζ=1.1 overdamped + r=0 → follows and settles with NO overshoot/ring (the ring was the vertigo)
+    function frame(now){
+      if(!attached && root.style.pointerEvents==='auto'){ attached=true; items.forEach(el=>io.observe(el)); }   // wait until the body has fully ARRIVED (module sets pointerEvents:auto at bodyP>=0.98) so reveals fire when you're looking, not during the fade-in
+      const dt=Math.min(1/30,Math.max(1/120,(now-lastT)/1000)); lastT=now;
+      const top=root.scrollTop, vel=(top-lastTop)/dt; lastTop=top;                                 // scroll velocity inside #siteBody
+      skew.update(dt,[Math.max(-1,Math.min(1,vel/4200))]);
+      root.style.setProperty('--sv',(skew.y[0]*0.9).toFixed(3)+'deg');                              // whisper of shear (±~0.9°), no oscillation
+      for(let i=decoders.length-1;i>=0;i--){ const d=decoders[i], p=Math.min(1,(now-d.t0)/d.dur), solid=Math.round(p*d.t.length);
+        if(now-d.roll>45){ d.roll=now; for(let k=0;k<d.t.length;k++) d.rnd[k]=GLY[(Math.random()*GLY.length)|0]; }
+        let s=''; for(let k=0;k<d.t.length;k++) s+= d.t[k]===' '?' ':(k<solid?d.t[k]:d.rnd[k]);
+        if(s!==d.prev){ d.el.textContent=s; d.prev=s; }
+        if(p>=1){ d.el.textContent=d.t; decoders.splice(i,1); }
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
   })();
 </script>
 
@@ -1081,6 +1188,45 @@ void main(){
   function init(){ document.querySelectorAll('canvas.fcard').forEach(mount); }
   if(document.readyState!=='loading') init(); else addEventListener('DOMContentLoaded',init);
 })();
+</script>
+
+<!-- ===== DRAMATIC LAYER: living liquid backdrop (2D metaball field, cursor-reactive) + custom cursor ===== -->
+<script>
+// ---- LIQUID BACKDROP: soft cold blobs drift + get shoved by the cursor; CSS blur melts them into liquid. Fades in with the body. ----
+try{(function(){
+  const cv=document.getElementById('liquidBg'), root=document.getElementById('siteBody'); if(!cv||!root) return;
+  const ctx=cv.getContext('2d'); const DPR=Math.min(1.6, window.devicePixelRatio||1); let W=1,H=1;
+  function size(){ W=cv.width=Math.max(1,Math.floor(innerWidth*DPR)); H=cv.height=Math.max(1,Math.floor(innerHeight*DPR)); cv.style.width=innerWidth+'px'; cv.style.height=innerHeight+'px'; }
+  size(); addEventListener('resize',size);
+  const COLORS=[[110,141,255],[42,73,184],[126,60,255],[30,64,255],[95,128,232],[255,138,61]]; // cold cobalts/violets + one warm ember
+  const N=15, blobs=[];
+  for(let i=0;i<N;i++) blobs.push({ x:Math.random(), y:Math.random(), vx:(Math.random()-.5)*0.00009, vy:(Math.random()-.5)*0.00009, r:0.16+Math.random()*0.24, c:COLORS[i%COLORS.length], ph:Math.random()*6.283 });
+  let mx=0.5,my=0.5,mX=0.5,mY=0.5;
+  addEventListener('pointermove',e=>{ mx=e.clientX/innerWidth; my=e.clientY/innerHeight; });
+  function frame(t){
+    const op=parseFloat(root.style.opacity||'0'); cv.style.opacity=op.toFixed(3);
+    if(op>0.008){
+      mX+=(mx-mX)*0.08; mY+=(my-mY)*0.08;
+      ctx.globalCompositeOperation='source-over'; ctx.fillStyle='#070c1a'; ctx.fillRect(0,0,W,H);
+      ctx.globalCompositeOperation='lighter';
+      const ti=t*0.00018;
+      for(const b of blobs){
+        b.x+=b.vx; b.y+=b.vy;
+        if(b.x<-0.35)b.x+=1.7; else if(b.x>1.35)b.x-=1.7;
+        if(b.y<-0.35)b.y+=1.7; else if(b.y>1.35)b.y-=1.7;
+        let px=b.x+Math.cos(ti+b.ph)*0.035, py=b.y+Math.sin(ti*1.3+b.ph)*0.035;
+        const dx=px-mX, dy=py-mY, d=Math.hypot(dx,dy)||1e-4;
+        if(d<0.3){ const f=(0.3-d)/0.3*0.14; px+=dx/d*f; py+=dy/d*f; }
+        const cx=px*W, cy=py*H, rr=b.r*W, C=b.c;
+        const g=ctx.createRadialGradient(cx,cy,0,cx,cy,rr);
+        g.addColorStop(0,'rgba('+C[0]+','+C[1]+','+C[2]+',0.6)'); g.addColorStop(1,'rgba('+C[0]+','+C[1]+','+C[2]+',0)');
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,rr,0,6.2832); ctx.fill();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();}catch(e){ console.warn('liquid bg off:',e); }
 </script>
 </body>
 </html>
