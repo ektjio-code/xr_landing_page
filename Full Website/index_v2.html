@@ -1018,7 +1018,7 @@ void main(){
   float skipD=camD/-rayDir.z; float stepD=(dist-skipD)/float(PS);
   vec3 rp=rayOri+rayDir*(skipD+stepD*hash(gl_FragCoord.xy));
   for(int i=0;i<PS;i++){ vec2 suv=rp.xy/vec2(A,1.0)+0.5; float h=texture(uDepth,suv).r; if((h-1.0)*RELIEF>rp.z) break; rp+=rayDir*stepD; }
-  vec2 uvP=rp.xy/vec2(A,1.0)+0.5; uvP+=uShift*0.015;
+  vec2 uvP=rp.xy/vec2(A,1.0)+0.5; uvP+=uShift*0.024;
   float depth=texture(uDepth,uvP).r;
   float blur=uDofMax*clamp(uZoomR,0.,1.)*lstep(0.0,0.5,abs(depth-uFocus.z)+uDofOffset);
   vec3 col=vec3(0.0); float ang=6.2831853*hash(gl_FragCoord.xy+17.0);
@@ -1053,7 +1053,7 @@ void main(){
       const prev=hoverR; hoverR=Math.min(Math.max(hoverR+4*dt*(mouse.inside?1:-1),0),1); dofR=Math.min(Math.max(dofR+(mouse.inside?0.75:-1)*dt,0),1);
       if(prev<hoverR){ if(ki(prev)!==ki(hoverR)){const a=Math.random()*6.283,s=fit(hoverR,0,0.6,1,0);knT.x=Math.cos(a)*s;knT.y=Math.sin(a)*s;} if(ki(hoverR)===KT.length){knT.x*=0.5;knT.y*=0.5;} } else {knT.x*=0.95;knT.y*=0.95;}
       kn.x+=(knT.x-kn.x)*0.2; kn.y+=(knT.y-kn.y)*0.2;
-      let T; if(mouse.inside){const R=fit(hoverR,0,0.3,1,0)*0.75; T=[-(mouse.tx+Math.cos(t*20)*R),-(mouse.ty+Math.sin(t*30)*R),FOCUS_ON];} else {T=[0,0,FOCUS_OFF];}
+      let T; if(mouse.inside){const R=fit(hoverR,0,0.3,1,0)*1.05; T=[-(mouse.tx+Math.cos(t*20)*R),-(mouse.ty+Math.sin(t*30)*R),FOCUS_ON];} else {T=[0,0,FOCUS_OFF];}
       fS.update(dt,T); zS.update(dt,[mouse.inside?1:0]);
       if(!ready) return;
       gl.useProgram(p);
