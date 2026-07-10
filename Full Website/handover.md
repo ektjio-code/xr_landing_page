@@ -1,49 +1,93 @@
-# XRZENO — Session handover (2026-07-07, end of day 2)
+# XRZENO — Session handover (current: 2026-07-08, end of day 3)
 
-Read this, then `CLAUDE.md` (same folder) for the deep per-step history and levers.
+Read this first, then `CLAUDE.md` (same folder) for deep per-step history + levers. The repo-root
+`HANDOVER.md` is a separate, older **deep-technical** note (bottle lean, transmission verdict, glass
+recipe, AR asset build) — still valid reference, don't overwrite it.
 
-## TL;DR
-Desktop AND mobile are now **feature-complete pending real assets.** Everything is committed and pushed (`origin/main` at `0bdf587`). Next session is Ed dropping in the real assets.
+## Who / preferences (honor these)
+- **Site language: ENGLISH.** The site ships in English. (An Indonesian translation exists in
+  `strings.js`, but it's machine-drafted — native review before launch; it is not the default.)
+- **The user goes by "Ed."** Address him as Ed.
+- **Commits:** author **`ed@localhost`** (keep his real email out of git). **Never commit**
+  `.claude/settings.json`, the `xrzeno-concept` package/zip, or screenshots.
+- **Hosting / deploy / DNS is OUT OF SCOPE** — Ed's web admins own Cloudflare Pages / cutover / bilingual
+  serving. My deliverable stops at working static files. Don't propose or set up deployment.
+- **Working style:** one change at a time, test live — Ed eyeballs everything and can't see my screen
+  (batch only when he asks for speed). When I *can't* eyeball a behavior, **instrument it** (an on-screen
+  HUD / readout) rather than guess — blind iteration on the auto-scroll burned many cycles before a HUD
+  found the actual bug.
+- **Watch the AI em-dash tell** in site copy and my own prose. The copy dash-sweep is deferred to
+  finalization.
+- **Push after every MOBILE change** — Ed tests mobile on the GitHub Pages URL, not localhost.
 
-## Where it stands
-- **Desktop (`index_v2.html`, three r0.169):** cinematic narrative (materialize → journey rail → clay/final → beats → cold-night finale relight → solid-white XRZENO) → scroll-lock handoff blurs the scene into a cold background and the site fades in over it → cold Monture-themed body + drawer. Plus mouse parallax on the rail, perf-freeze once the site is in, and reveal-on-scroll body life.
-- **Mobile (`index.html`, three r0.160):** pinch to materialize (1-finger rotate, kept AR button) → **tap anywhere once formed** → the 3D defocuses and the website blurs into view → 3D disabled. Same cold body + drawer + social. No beats/finale on mobile (scratched — too busy for the small screen).
-- Both drawers: Portfolio / How it works / FAQ / Contact + EN↔ID toggle + WhatsApp + a social row (Instagram, TikTok, Threads, Facebook, X).
+## Where it stands (committed `73eed99`, NOT pushed)
+Desktop `index_v2.html` (three r0.169) + mobile `index.html` (r0.160) — both **feature-complete pending
+real assets**:
+- Hero cinematic (materialize → journey rail → clay→final PBR → pinned beats → cold-night finale relight
+  → XRZENO wordmark) → scroll-lock handoff → cold Monture-palette DOM **body** + glass **drawer**.
+- **Body "Lusion motion pass" (this session):** liquid metaball backdrop, word-fly section headers (`h2`),
+  matrix-decode subheaders (`.eyebrow`), reversible reveal-on-scroll on photos / cards / steps / FAQ /
+  buttons / footer, magnetic buttons, springy mouse parallax on the rail.
+- **Body TEXT blurbs (`.lede`, `.note`) are STATIC** by Ed's call — every *other* element animates.
+- ❌ **Auto-scroll was tried and REVERTED.** A wheel-driven momentum auto-scroll for the hero didn't work
+  and was dropped — back to native scroll driving the cinematic. Why it failed: the camera reads a heavily
+  damped follower (`curJ += (journeyP-curJ)*0.1`), so a velocity driver built a backlog that discharged
+  *after* release → felt inverted. Snapshot preserved at the session scratchpad
+  `index_v2.AUTOSCROLL-EXPERIMENT-backup.html`.
 
-## File / git state
-- Working files: repo-root `index_v2.html` (desktop, truth) and `index.html` (mobile). `strings.js` (EN+ID) at repo root, loaded by both.
-- `Full Website/index_v2.html` is kept **in sync** with the repo-root copy (reconciled every desktop commit). Mobile `index.html` has no second copy.
-- NOT committed on purpose: `.claude/settings.json` (pinned), the `xrzeno-concept` package/zip, `Screenshot_8.png`.
-- ⚠️ **Git flakiness:** `.git` writes intermittently fail (repack `Permission denied`, `couldn't set 'refs/...'`) — almost certainly OneDrive/AV locking files under "WORK STUFF". `gc.auto`/`maintenance.auto` are disabled to reduce it. Pushes still land on GitHub; when a ref-write errors, verify with `git ls-remote origin -h refs/heads/main` (the local tracking ref lags, shows false "ahead"). Real fix (Ed): exclude the repo `.git` from OneDrive/AV, or move the repo out of the synced folder.
+## Git / files
+- HEAD **`73eed99`** (ed@localhost), **not pushed** (origin/main at `0bdf587`). Push when Ed asks.
+- Truth files: repo-root `index_v2.html` (desktop) + `index.html` (mobile) + `strings.js` (EN+ID).
+  `Full Website/index_v2.html` is kept **byte-identical** to the root desktop copy — mirror after every
+  desktop edit (`cp "Full Website/index_v2.html" index_v2.html` from repo root).
+- `.git` writes intermittently fail (OneDrive/AV lock). Pushes still land — verify with
+  `git ls-remote origin -h refs/heads/main` if a ref-write errors (local tracking ref lags).
 
 ## How to run / test
-- Desktop: `python -m http.server 8000 --bind 127.0.0.1` from repo root, open `http://127.0.0.1:8000/index_v2.html?stay`.
-- Mobile: Ed tests on a real device off the pushed GitHub Pages URL (`ektjio-code.github.io/...`), not localhost. **So push after every mobile change.**
-- `&lang=id` or the drawer toggle for Indonesian. After a JS edit, extract the module and `node --check`.
+- Desktop: serve repo root (`python -m http.server 8000 --bind 127.0.0.1`) →
+  `http://127.0.0.1:8000/index_v2.html?stay`. If patches don't show, suspect **browser cache / stacked
+  servers** — a no-cache server avoids it (`scratchpad/serve_nocache.py DIR PORT`).
+- Mobile: Ed tests on device off GitHub Pages — **push first**.
+- `&lang=id` or the drawer toggle for Indonesian. After a module JS edit: extract the
+  `<script type="module">` block and `node --check` it.
 
-## TOMORROW — assets (Ed inputs), then finalize
-1. **Portfolio:** GLB/USDZ for cards 2 & 3 (card 1 already uses `shinobu_2k_ar.glb/.usdz`). Update `src`/`ios-src` + titles in both files' portfolio cards.
-2. **Compare slider:** the real photo + render pair. They MUST be the same angle/framing or the compare trick dies. Currently placeholder gradients (`.ph-real` warm, `.ph-render` cold); swap to `background-image:url(...)`.
-3. **Social handles:** real URLs for the 5 drawer icons (currently `instagram.com/xrzeno` etc. placeholders) in both files.
-4. **Copy dash-sweep** (deferred to finalization): strip AI-dash tells from `strings.js` (EN+ID) and body copy. ID copy is machine-drafted — native review before launch.
+## NEXT — what we're supposed to do
+1. **Rework the hero scroll (Ed's active idea, "cooking").** Reference **Lusion's astronaut piece**.
+   Carry-over lesson: drive the camera/timeline from a scroll-**position** scalar, NOT an integrated
+   velocity — that's exactly what made the auto-scroll feel inverted.
+2. **"Print Pass" strips-wipe hero→body transition** (owner-approved spec, in hand — variant B "Strips").
+   Replaces the current Step-7 canvas release: as scroll passes `#track`, the hero scrim dissolves in
+   ~34px vertical strips (random static order, per-strip bottom→top wipe), the body "prints" in, fully
+   scrub-reversible (**static hash, NO time term** = the reversibility rule). Fragment shader + a
+   critically-damped SOD (f=2.0, ζ=1.0, r=0). **BLOCKED on Ed dropping in the reference demo file
+   `xrzeno-bleed-transition-demo-v2.html`** — the spec says lift the shader/constants from it. Dark-on-dark
+   contrast is known/accepted: default mitigation = stronger `EDGE_TINT`; the blue edge line / body
+   brightness lift need Ed's explicit OK. (Full spec pasted 2026-07-08; see also CLAUDE-ADDENDUM gotcha #1.)
+3. **Real assets (Ed inputs):**
+   - Portfolio GLB/USDZ for **cards 2 & 3** (card 1 uses the bottle). Update `src`/`ios-src` + titles in
+     both files.
+   - Compare slider: the real **photo + render pair** — MUST be the same angle/framing or the compare
+     trick dies (currently placeholder gradients `.ph-real` / `.ph-render`).
+   - Real **social handles** for the 5 drawer icons (currently `instagram.com/xrzeno` etc. placeholders)
+     in both files.
+4. **Copy dash-sweep at finalization:** strip AI-dash tells from `strings.js` (EN+ID) + body copy; ID is
+   machine-drafted (native review before launch).
 
-## Parked / possible later (not blocking)
-- The compare-slider one-time "nudge" hint on reveal (signals it's draggable) — proposed, not built.
-- Desktop keyboard-scroll parity inside the locked site (space/PageD, currently wheel/trackpad only).
-- Three.js version convergence (0.160 mobile vs 0.169 desktop).
-- Deployment/hosting is OUT OF SCOPE (Ed's web admins own it).
-
-## Working style and pins (honour these)
-- One change at a time, test live. Ed eyeballs everything and cannot see my screen. (Batch-and-eyeball is fine when he asks for speed.)
-- **Push after every mobile change** so Ed can test on device; flag natural checkpoints.
-- **Watch the AI-copywriting dash tell** in copy and prose. The copy sweep is deferred to finalization.
-- **Ignore hosting/deploy/DNS entirely.**
-- Commits use `ed@localhost`; do not commit `.claude/settings.json`. He goes by Ed.
+## Parked / later (not blocking)
+Compare-slider one-time "nudge" hint · desktop keyboard-scroll parity inside the locked site (wheel/
+trackpad only now) · three.js version convergence (0.160 mobile vs 0.169 desktop) · the "dock" idea
+(finale XRZENO shrinks + travels into the drawer control).
 
 ## Load-bearing gotchas
-- Reversibility: the rail, relight, and parallax read from **damped scalars** and set state DIRECTLY. Never a per-frame `camera.position.lerp` follow (lags asymmetrically, breaks reverse-scroll).
-- A running CSS `animation` overrides inline `style.opacity` — hide pulsing elements with a class that sets `animation:none` (both the desktop hint and the mobile hint hit this).
-- Desktop scroll-lock magic number `RAMP=innerHeight*0.9` must stay matched to the `bodyP` denom AND `#release` height.
-- Reveal-on-scroll uses a **viewport** IntersectionObserver root, not `#siteBody` (the fixed internally-scrolled container didn't fire it on desktop).
-- `--warm` is `#siteBody`-scoped; the drawer hardcodes `#ff8a3d`. Keep in sync.
-- Mobile entry is a TAP, not scroll (scroll fought the camera orbit). Do not reintroduce mobile scroll-into-body.
+- **Reversibility:** the rail / relight / parallax read damped **scalars** and set state **directly** —
+  never a per-frame `camera.position.lerp` follow (lags asymmetrically → breaks reverse-scroll). This is
+  also why the velocity auto-scroll failed.
+- A running CSS `animation` overrides inline `style.opacity` — hide pulsing elements with a class that
+  sets `animation:none`.
+- Scroll-lock `RAMP = innerHeight*0.9` must stay matched to the `bodyP` denominator AND the `#release`
+  height.
+- Reveal-on-scroll uses a **viewport** IntersectionObserver root, not `#siteBody`.
+- `--warm` is `#siteBody`-scoped; the drawer hardcodes `#ff8a3d` — keep in sync when tuning the orange.
+- Mobile entry is a **TAP**, not scroll (scroll fought the camera orbit) — don't reintroduce mobile
+  scroll-into-body.
+- **Contact:** WhatsApp **+62 823-4273-6941** → `wa.me/6282342736941`; email `hello@xrzeno.com`.
