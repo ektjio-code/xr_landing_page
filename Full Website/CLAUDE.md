@@ -1,120 +1,162 @@
-# XRZENO Website — Handoff (continued from Claude.ai session, 2026-07-06)
+# XRZENO Website — single source of truth
 
-## The project
-Marketing site for **XRZENO**, a WebAR product-visualization service. Site language: **English**. Goal: the site itself must demonstrate the capability — a visitor should think "these guys can do this."
+Marketing site for **XRZENO**, a WebAR product-visualization studio (menu/restaurant AR is one service
+line, not the identity). Site language **English**. Goal: the site itself must demonstrate the capability —
+a visitor should think "these guys can do this." This file is the ONLY handover/instructions doc (merged
+from the old `handover.md` + root `HANDOVER.md`, 2026-07-10).
 
-### Existing files (in `reference/` here; live versions are in the project folder)
-- **`index_scene.html`** — DESKTOP page. Three.js **r0.169**. Full tokonoma room scene (`Tokonama Scene/shinobu_tokonoma.glb` + 2K EXR HDRI; note the folder name uses `%20` in URLs). Scroll-driven "materialize": 36K points sampled off the bottle fly home, bottle fades in over 55–100% of form, room set fades in 90–100%. Fake DOF via mask-blur composite (bottle sharp, rest blurred; layer 1 = mask). UnrealBloom on the dust embers. Fake glass recipe: transmission stripped → black alpha 0.12 + explicit envMap. Baked lights (shoji spot, museum downlight, rect area). OrbitControls constrained ±45° az/polar, zoom+pan locked. `compileAsync` warm-up kills the first-form hitch. Debug hotkeys: **C** log camera JSON, D toggle DOF, R reset cam, [ ] exposure, E cycle env, B toggle HDRI bg. Mobile (pointer:coarse) redirects to `index.html` unless `?stay`.
-- **`index.html`** — MOBILE page. Three.js **r0.160** (⚠ version mismatch with desktop — converge eventually; flagged, not urgent). Bottle-only (`shinobu.glb`) on warm-charcoal bg, RoomEnvironment IBL (synchronous), 3 dir lights + ambient, NO shadows/DOF, bloom self-disables once formed, DPR cap 1.5, 16K points. **Pinch drives materialize** (squeeze = form, spread = disperse), 1-finger rotate with inertia, scroll fully locked (`#track` 100vh, `touch-action:none`). Desktop redirects to `index_scene.html` unless `?stay`.
-- Both: AR launch — iOS `shinobu_2k_ar.usdz` via rel=ar, Android Scene Viewer intent with `shinobu_2k_ar.glb`, desktop shows a toast.
+---
 
-## Approved site structure (single page, English)
-1. **Hero — Materialize** (desktop: scroll; mobile: pinch-gate — scroll locked until formed, then unlocks with ~600ms guard against accidental scroll)
-2. **Journey** — scroll-scrubbed camera rail through the tokonoma scene, 2–3 baked camera stops, bottle material swaps **wireframe → clay → final PBR**, pinned text beats: *Scan → Rebuild → Deliver*. Mouse parallax on desktop (small ±2–3° offset on top of the rail); **no free orbit during the rail**.
-3. **Real vs Render** — draggable comparison slider (photo vs render). Canvas fades/releases before this point; everything below is plain DOM.
-4. **Portfolio** — 3–4 `model-viewer` cards, uniform neutral staging (same dark stage/lighting/frame so mixed-theme assets read as range), AR button per card.
-5. **AR handoff** — direct USDZ/Scene Viewer on mobile, QR code on desktop.
-6. **CTA** — WhatsApp (prefilled) + email.
+## Who / preferences (honor these)
+- **The user goes by "Ed."** Address him as Ed.
+- **Site ships in ENGLISH.** An Indonesian translation exists in `strings.js` but is machine-drafted
+  (native review before launch; not the default).
+- **Commits:** author **`Ed <ed@localhost>`** (keep his real email out of git) + the
+  `Co-Authored-By: Claude Opus 4.8 (1M context)` trailer. Commit to **`main`** (project convention — don't
+  branch). **Never commit** `.claude/`, the `xrzeno-concept` package/zip, or screenshots.
+- **Hosting / deploy / DNS is OUT OF SCOPE** — Ed's web admins own Cloudflare Pages / cutover / bilingual
+  serving. Deliverable stops at working static files. Don't propose or set up deployment.
+- **Working style:** one change at a time, test live — Ed eyeballs everything and can't see my screen
+  (batch only when he asks). When a behavior can't be eyeballed, **instrument it** (on-screen HUD) rather
+  than guess. Discuss/diagnose before patching when asked.
+- **Watch the AI em-dash tell** in site copy and my own prose. The copy dash-sweep is deferred to launch.
+- **Push after any MOBILE change** — Ed tests mobile on the GitHub Pages URL, not localhost.
+- **Contact:** WhatsApp **+62 823-4273-6941** → `wa.me/6282342736941`; email `hello@xrzeno.com`.
 
-**Decisions baked into the design:**
-- Critical info (services, CTA) lives ONLY in DOM sections 3–6, never inside the animated part.
-- Scroll-scrub uses heavy damping (existing `curF += (targetF-curF)*0.1` pattern) — fast flicks travel through the journey, never teleport. No scroll-snap/hijack.
-- **Architecture = Option A**: two files stay. `index_scene.html`-lineage = desktop, `index.html`-lineage = mobile, redirect kept. DOM sections will exist in both (duplication accepted for now; merging is a later refactor).
-- **Mobile parity principle (pinned):** mobile gets everything that's cheap — pinch materialize, wireframe/clay/final swaps, all DOM sections identical. It only drops the genuinely expensive: room scene, shadow maps, DOF pipeline, heavy bloom. Every new desktop feature gets a "does this port cheaply?" check BEFORE building.
-- Mobile journey (later): fixed camera + pivot — animate camera/pivot directly, no OrbitControls.
-- Pinch-to-materialize is a **core concept** — never trade it away.
+## Files & git
+- Repo: **github.com/ektjio-code/xr_landing_page** (`origin`/`main`). Pages (real AR + phone testing):
+  `ektjio-code.github.io/xr_landing_page/` — phones can't reach localhost, so **push before phone testing.**
+- **Truth files (repo root):** **`index_v3.html`** = ACTIVE desktop · `index_v2.html` = desktop fallback ·
+  `index.html` = mobile · `strings.js` = EN+ID copy.
+- Helpers at root (committed): `squiggle-scroll.html` / `squiggle-demo.html` (squiggle prototypes) +
+  `xrzeno-bleed-transition-demo-v2.html` (Print Pass reference). `Backup/` is gitignored (local snapshots).
+- `.git` writes intermittently fail (OneDrive/AV lock) — e.g. `update_ref failed for refs/remotes/...`, or
+  `couldn't set refs/heads/main`. **Pushes still land** — verify with `git ls-remote origin -h
+  refs/heads/main`; clear stale `.git/*.lock` and retry if a write errors.
 
-## Build order & current state
-- ✅ **Step 1 DONE** — `index_v2.html` (working copy of `index_scene.html`, in this folder; original untouched):
-  - Line 15: `#track` 400vh → **700vh** (mobile media query still forces 100vh)
-  - Lines ~250–257: added `const SPLIT = 0.5`, `let journeyP = 0`, `splitProgress()` — raw scroll 0..SPLIT → form (0–1), SPLIT..1 → `journeyP` (0–1, **unused until Step 2**). SPLIT=0.5 keeps materialize pacing identical to the old 300vh scrollable distance.
-  - Line ~503: loop uses `splitProgress()` instead of `scrollProgress()` for `targetF`
-  - Syntax-checked (node --check on the extracted module). ✅ **Live-confirmed 2026-07-06** (Ed): materialize now completes at mid-page, front-half pacing unchanged. The "feels faster" was scrollbar perception (finishes at 50% of a longer page), not a regression.
-- ✅ **Step 2 DONE — camera rail live-confirmed 2026-07-06, synced to this `Full Website/` copy.** Re-sequenced to **5 stops: #4 → #2 → #3 → #1 → #5** (sit at journeyP 0 / .25 / .5 / .75 / 1). `RAIL[]` + `railPose(p)` smoothstep-interpolate pos+target. **Rotation FULLY locked** (`enableZoom/Pan/Rotate=false`) — no drag-spin ever; camera is baked/rail-driven only (this dropped the original desktop "drag to spin", per Ed). **Baked start cam = #4** — the materialize is framed there, and it's the journey's first stop.
-  - ⚠️ **Reversibility (load-bearing fix):** the rail pose is read from a **damped scroll scalar `curJ`** (`curJ += (journeyP-curJ)*0.1`) and set on the camera **DIRECTLY** (`camera.position.copy(_railPos)`), NOT via a per-frame `camera.position.lerp(pose,0.1)` follow. A vector-lerp follow is history-dependent → lags asymmetrically → **won't retrace on reverse-scroll** (Ed caught this). Damping the scalar keeps the glide while making the pose a pure function of scroll → lands identically both directions. Journey branch stays active until `curJ` settles (`journeyP>0.0005 || curJ>0.0005`) so reverse eases cleanly back to #4. `setJourneyMaterial(curJ)` too → material in lockstep.
-  - ⚠️ **Feel note:** the fully-curated rail reads as "interactivity sacrificed" (by-design, no free orbit). Antidote = **mouse parallax (±2–3° lean, framing stays locked)**, PARKED for **Step 7**. Free-orbit-during-journey = REJECTED (fights the reveal).
-  - **DOF off on the #5 wide deliver** (`blurOn = … && curJ<0.88`) — composition choice: whole diorama crisp at the pull-back (the mask-blur "keep bottle sharp" trick breaks once bottle≈bg distance is large). Middle shots keep DOF; the #4 opening wide deliberately keeps it too (Ed: "not chasing realism, just tailored composition").
-  - **All 5 stops now ACTIVE** (no backups left), FOV 40: **#4** wide 3/4 high `[0.3891,0.358,0.2767]`→`[0.0938,0.1684,-0.0366]` · **#2** low front-left `[-0.1904,0.0383,0.2737]`→`[0.0595,0.1382,-0.0548]` · **#3** tight high/cap `[0.1004,0.1839,0.0833]`→`[0.0626,0.2241,-0.0586]` · **#1** tight front/label `[0.0497,0.0975,0.1378]`→`[0.053,0.086,-0.0689]` · **#5** wide pull-back `[0.0356,0.0137,0.691]`→`[0.0553,0.2375,-0.0209]`.
-- ✅ **Step 3 DONE (first pass, confirmed 2026-07-06)** — material story = **materialize INTO clay → resolve to final PBR → DELIVER (glass)**. A wireframe/SCAN state was built then **DROPPED — too jarring** (the finished→wireframe flip; electric-blue emissive version also tried). Mechanism: a **clay overlay** (`matClay` — transparent, `depthWrite:false`, `renderOrder 2`, `MASK_LAYER` so DOF keeps it sharp) is cloned per body mesh and **parented to it** (shares geometry → inherits transform), cross-fading over the real-PBR base (base always keeps real PBR; base + glass collected as `bodyMeshes`/`glassMeshes` in the loader).
-  - **Form phase** `setFormMaterial(curF)`: clay opacity = base fade-in (`meshIn`) so the dust materializes **AS clay** at #4; **glass hidden** (it's "finished", waits for DELIVER).
-  - **Journey** `setJourneyMaterial(curJ)`: `clay = curJ<0.10 ? 1 : clamp((0.52-curJ)/0.42)` → essentially final **by #3 (p≈0.5)** so the bottle's **red samurai mask reads red** on that detail shot; **glass reappears at `curJ>0.85`** for the #5 pull-back.
-  - Tuning knobs (one-liners): clay color `0xb8ae9f`/rough 0.85; resolve window `0.10→0.52`; glass reveal `0.85`. Watch-outs: clay can read dark (lit only by baked spots, env=0); overlay is coincident geometry (depthWrite:false + renderOrder handle z-fight); AR button still shows once clay-formed (`curF>0.85`) — AR asset is the finished bottle, harmless.
-- ✅ **Step 4 DONE — pinned beat text + finale (confirmed 2026-07-06).** DOM overlays (`#beats`), all driven by **`curJ`** (reversible), focus-pull transitions (`showBeat` ramps opacity ahead of blur). Font = **Montserrat** (Google Fonts webfont, `<link>` in head).
-  - **Beats:** SCAN (top-right, `curJ` band ~.02–.24) · REBUILD (top-right, ~.30–.60) · DELIVER (center-top, comes in ~.72). Copy is single words. Timing bands in `updateBeats()`.
-  - **Flavor texts** (Scan/Rebuild/Deliver) = white Montserrat-800 + a **soft 2-layer text-shadow** (`0 1px 2px` edge + `0 4px 30px` halo) so they read over the bright plaster. **A local scrim was A/B-tested against the shadow (debug `T` toggle) and REJECTED — shadow won, "not even close." Don't reintroduce a flavor-text scrim.**
-  - **Finale (the money shot):** DELIVER fades in on the pull-back, then **auto-retires** (`deliverFade` eases once `xrReveal>0.97` — no interaction). **XRZENO** = two stacked layers (sharp + blurred) with **complementary masks** → focus-**sweeps L→R** and is **FLAT when settled (no halo/bloom)**. It **appears LAST**, on a **slow time-eased `xrReveal`** (engages when `curJ>0.92`, ~3s ease — deliberately not scroll-paced). Gradient: horizontal **white→navy `#101f3d`**, blue from the **Z**, full navy by ~70% (so the O is solid).
-  - **Lights-down finale (Ed's idea, load-bearing):** `renderer.toneMappingExposure = exposure*(1 - 0.55*xrReveal)` — the **scene dims as XRZENO reveals**. Plus a light top-center `#beatScrim` (`xrReveal*0.45`) for clean ground. Both reverse on scroll-up.
-  - **Top-left `#brand` XRZENO stays** — it's the future tools/nav, NOT a duplicate to remove.
-  - ❌ **Raster logo REJECTED:** used the real `xrzeno_logo.jpeg` cut out to `logo_xrzeno.png` (white bg knocked out via PIL) as the finale wordmark — Ed: "tacky as fuck" (it's a glossy *photographed sign*, clashes with the matte scene). Dropped for live Montserrat text. Both image files still sit in the parent folder, unused. The mark is Montserrat-based.
-  - **Levers:** dim depth `0.55` · reveal speed `0.018` · DELIVER fade `0.015` · scrim `*0.45` · gradient stops · shadow opacities.
-- ✅ **Scene liveness — dust LIGHT-SHAFT FLARE (confirmed 2026-07-06, Ed: "I like it").** Ambient motes felt static. A per-mote twinkle was tried and **rejected — "weaksauce."** What landed: the `_dust` motes now use **vertex colours**, and each frame their brightness = a dim ambient shimmer **+ a bright FLARE gaussian-falloff'd off the shoji spot's beam axis** (`beamO/beamD/beamLen` precomputed from `spot.position`→`spot.target`; motes light up crossing the shaft, like dust in a sunbeam). Loop: `b = 0.22 + 0.12·sin(twinkle) + 1.3·beam`. Tuning: beam width `w=0.10+tt*0.22`, flare `1.3`, mote size `maxDim*0.016`, opacity `0.55·din`. Branch-shadow gobo idea rejected (too much work).
-- ✅ **"View 3D Model" free-orbit inspect mode (confirmed 2026-07-06).** Desktop button (was "View in your space"; desktop never did real AR anyway) **renamed → "View 3D Model"**, appears only at **full formation** (`curF>0.985`). Click = **DOLLY** (~0.9s smoothstep, `startTween`) out of the cinematic into a free-orbit inspect of the **finished bottle** (`setJourneyMaterial(1)` forces final PBR + glass regardless of scroll position); lights blend up to full, page scroll frozen (`documentElement.overflow`), beats/finale hidden, **beam-flare dust kept**. ±45° orbit re-enabled at the dolly's end. Button toggles to **"Exit 3D View"** → dollies back to the rail pose for the current scroll, lights blend back down. The dolly owns the camera via a `tween` branch (checked FIRST in the loop). `launchAR()` still defined but unused on desktop.
-  - Camera reset on enter = front view `[0.0435,0.1458,0.3604]` → tgt `[0.0938,0.1684,-0.0366]` (centre of the ±45° range). Levers: dolly `dur:900`ms, inspect pose consts.
-- ✅ **Hint fix:** "Scroll to materialize" now stays (pulsing) through the form and **fades out at full formation** (`curF>0.92`) via a `.gone` class. NOTE (load-bearing gotcha): a running **CSS `animation` overrides inline `style.opacity`** — the old `hintEl.style.opacity='0'` never actually hid it (it kept pulsing). Must kill the animation (`.gone{opacity:0;animation:none}`), not just set opacity.
-- **Step 5** — mobile: pinch-gate → scroll-unlock (swap body overflow once form ≈ 1, ~600ms guard; hint text changes "Pinch to materialize" → "Scroll to explore ↓"), then simplified journey + material swaps in the `index.html`-lineage file.
-- **Step 6** — DOM sections 3–6 (slider, portfolio, AR handoff, CTA). Real product photos for the slider are confirmed easy to source. WhatsApp number/prefill text: still needed.
-- **Step 7** — mouse parallax + polish (bloom/DOF behavior along the rail, canvas fade-out/release into the DOM sections).
+## How to run / test
+- Serve repo root: `python -m http.server 8000 --bind 127.0.0.1` → `http://127.0.0.1:8000/index_v3.html?stay`
+  (`?stay` overrides the device redirect). `index_v2.html?stay` for the old cinematic. `&lang=id` or the
+  drawer toggle for Indonesian.
+- After a JS edit, extract each `<script>` and `node --check` it (v3 = 1 module + several classic scripts:
+  strips scrim, squiggle bg, body-motion, focus-cards). If patches don't show, suspect **browser cache /
+  stacked servers.**
 
-## Site body — full-site replacement concept (received 2026-07-06, owner-approved bases) — SUPERSEDES old Step 6
-Package at `Full Website/xrzeno-concept/xrzeno-concept/` (`CLAUDE-ADDENDUM.md` = full spec). The narrative (index_v2, Steps 1–4) is the front door; a quiet DOM **body** below carries all info + SEO. XRZENO = premium product-viz studio (menu/restaurant AR is one service line, not the identity).
-- ⛔ **HOSTING IS OUT OF SCOPE (pinned).** Ed's web admins own Cloudflare Pages / DNS / `_redirects` / cutover / bilingual *serving*. My deliverable stops at **working static files** — don't propose or set up deployment. (See memory `feedback-ignore-hosting`.)
-- **Deliverables (integrate, DON'T redesign):** `body/skeleton.html` (drawer + real-vs-render slider + portfolio + process + FAQ + CTA + footer, previewable standalone), `body/strings.js` (EN+ID copy; ⚠ ID is machine-drafted — native review before launch), `components/compare-slider.html` (invisible `<input type=range>` technique), `components/portfolio-card.html` (model-viewer + AR). Design tokens + Montserrat already match the scene.
-- **BUILD STEPS:**
-  1. ✅ **Canvas-release handoff DONE (2026-07-07)** — NOT a fade-to-void. The scene relights cold then blurs into a cold blobby background that STAYS; the site fades in over it, and a **scroll-lock** hands scrolling to `#siteBody` once faded in. See the 2026-07-07 section below.
-  2. ✅ **Drawer DONE (2026-07-07)** — `#brand` → `#drawerCtl` + `#drawer` glass pane, lock-aware nav, EN/ID toggle, WhatsApp. Rail fast-forward preserved. See below.
-  3. ✅ **Body integrated (2026-07-07)** — skeleton sections appended inside `#siteBody`, `strings.js` wired, themed to the Monture cold palette. See below.
-  4. **Real assets (NEED FROM ED):** portfolio GLB/USDZ set; the real photo+render pair for the slider (must be SAME angle/framing or the compare trick dies). Still outstanding.
-- **Contact (now known):** WhatsApp **+62 823-4273-6941** → `wa.me/6282342736941`; email `hello@xrzeno.com`.
-- **Still-parked polish:** mouse parallax (±2–3°); the "dock" (finale XRZENO shrinks + travels into the drawer control); exit-inspect material blend. Corner-brand-fade = REJECTED (drawer reframes it).
+---
 
-## Session 2026-07-07 — handoff, body, palette, drawer (committed+pushed `175d881`)
-- ✅ **Cold-night finale RELIGHT (Ed-confirmed; the veil was rejected).** The finale re-lights the actual scene, it is NOT an overlay. Warm baked spots ease to cold moonlight (`SPOT_WARM 0xffda95 → SPOT_COLD #5f80e8`, `MUS_WARM 0xfff4e2 → MUS_COLD #86a4ff`) via `spot.color.copy(WARM).lerp(COLD, cold)` each frame. A shared **`revF` reveal-factor** (declared before the tween/inspect/journey branch) drives BOTH the lights-down dim (`exposure*(1-0.55*revF)`) AND the relight, so they never desync. `revF=0` in inspect/3D-view and eases with the dolly's `s`, so **free-cam is always default warm** (Ed caught the "light stays blue in 3D view" bug). Two earlier tries — a full-screen `#coolVeil` alpha wash, then a `mix-blend-mode:multiply` gel — both rejected ("it's still a veil dude"); relighting was the answer.
-- ✅ **Canvas→site handoff = SCROLL-LOCK (Ed-confirmed).** `#coolVeil` is now a blue radial that only carries the body **background** (`cool=clamp(bodyP)`, `*0.72`). Past `#track` (700vh) an `#release` runway (**80vh = 0.8 screens**; started at 240/280vh, Ed found it too slow, cut to 1/3). `bodyP = clamp((scrollY-(track-innerHeight))/(innerHeight*0.8))`. The canvas STAYS as a blurred blob (`filter:blur(bodyP*44)`), site fades in (`#siteBody` opacity=bodyP). At `bodyP>=0.99` **`enterBodyLock()`** freezes page scroll (`documentElement/body overflow:hidden`) and `#siteBody` (fixed, `overflow-y:auto`, `overscroll-behavior:none`) owns scrolling — one active scroll zone, no window-vs-body desync. A `wheel` listener: at `siteBody.scrollTop<=0` + `deltaY<0` → **`exitBodyLock()`** restores page scroll at `bodyP≈0.9` (`RAMP()*0.9`) so the narrative eases back. **Levers:** `RAMP=innerHeight*0.8` (MUST match the bodyP denom AND `#release` height), lock threshold `0.99`, exit landing `0.9`.
-- ✅ **Body themed to the Monture COLD palette**, scoped to `#siteBody{ --ink:#eaf1ff; --muted:#93a4c7; --accent:#1e40ff (cobalt); --warm:#ff8a3d; --bg-deep:#0a1633; --hairline:rgba(150,180,255,.14); --navy:#0a1633 }` so the **warm narrative (outside `#siteBody`) is untouched**. **Teal/orange split (early-2000s poster, Ed's ask):** cobalt for all structure (eyebrows, step rules, FAQ, numbers); **warm `#ff8a3d` reserved for the one HIGHLIGHTED action** — both WhatsApp CTAs (identical solid pills, dark `#1a0e04` text) + the compare-slider signature line. Card stage gradient cooled (`#241d15 → #0f1c3a`).
-- ✅ **Frosted-glass buttons.** Non-highlighted buttons (`.btn-mail`, `.card .arb`) took the "View 3D Model" recipe: transparent-ish + `backdrop-filter:blur(6px)` + thin **cool** border `rgba(200,215,255,.30)` + pill. The `#ar` View-3D button keeps its **warm** border (warm narrative world) — shared glass treatment, border tint matches each button's surroundings (Ed OK'd this split).
-- ✅ **Drawer (replaces `#brand`).** `#drawerCtl` = button + chevron, z-index **100**, font 12px (Ed: "too big" → dialed down a couple notches). Opens `#drawer`, a **translucent BLUE glass pane** (`rgba(18,34,82,.42)` + `blur(16px)`, blue-tinted border) with `#scrim` (z98). Links (via `window.__nav`, module-scoped, exposed on window): Portfolio/Process/FAQ/Contact + EN↔ID `#langToggle` (re-renders copy in place) + `.d-wa` WhatsApp = **solid pill identical to the bottom `.btn-wa`**. **Lock-aware:** from the narrative, nav flies the window to the bottom (`scrollTo` smooth → the ~1s rail fast-forward happy accident) with `pendingSection` set, then `enterBodyLock()` lands on the section; from inside the site it `siteBodyEl.scrollTo` smooth. Close on scrim/Escape. Drawer JS split: `window.__nav`+lock live in the module; open/close+i18n+langToggle in the classic script.
-- ⚠️ **`--warm` is `#siteBody`-scoped;** the drawer (outside it) hardcodes `#ff8a3d`. Keep in sync when tuning the orange.
-- ⚠️ **`--warm` is `#siteBody`-scoped;** the drawer (outside it) hardcodes `#ff8a3d`. Keep in sync when tuning the orange.
-- ⚠️ **Docs vs code:** both `index_v2.html` copies (repo-root + `Full Website/`) are now reconciled/identical and committed.
+## Current state
 
-## Session 2026-07-07 (evening) — perf, parallax, MOBILE build, polish (pushed through `0bdf587`)
-- ✅ **Perf freeze (desktop).** The RAF loop is now a callable `loop()`; once the site is scroll-locked and `curF/curJ/xrReveal` are all settled, `rafPaused=true; return;` stops the loop. WebGL keeps showing the last frame under its CSS blur, so the blobby bg is unchanged; the whole composer pipeline stops running behind the DOM site. Woken by `exitBodyLock()` (scroll-up) and by `resize` (renders one fresh frame then re-freezes).
-- ✅ **Mouse parallax (Step 7, desktop).** `applyParallax(scale)` orbits the camera a hair (`PARALLAX=2.5°`) around `controls.target` based on the damped mouse (`pmx/pmy`, `0.06` damping). STATELESS — recomputed each frame from the pure rail pose, so reversibility holds. Eased to 0 into the finale (`1 - smoothstep((curJ-0.82)/0.18)`) so the money shot is steady. Journey-only.
-- ✅ **Desktop finale wordmark = SOLID WHITE.** Was white→navy gradient, tried white→black, both "drowned in the cold bg" → `.beat-final .d-brand span{background:#fff;...clip:text}`. The L→R focus-sweep (sharp/blur layers) is untouched.
-- ✅ **Desktop hero→site runway nudged 0.8 → 0.9 screens** (the 3 matched values: `#release` height, `bodyP` denom, `RAMP()`).
-- ✅ **MOBILE build (`index.html`, three r0.160) — the whole site now lives here too.** Model = **pinch to materialize → TAP anywhere (once formed) → website BLURS INTO VIEW → 3D disabled.** Deliberately NOT the desktop scroll model — scroll fought the 1-finger camera orbit, so **the hero never scrolls; entry is a tap** (Ed's call). Details:
-  - Hero stays scroll-locked (`body{overflow:hidden}`). Pinch forms (`targetF`), 1-finger rotates. Once `curF>0.98`, **"Tap to explore"** (`#explore`) swaps in below the **kept** AR button (`#hint` gets `.gone{animation:none;opacity:0}` — the pulse was overriding inline opacity, same trap as desktop).
-  - `enterSite()` (tap on `#explore`, tap ANYWHERE via a document click handler that excepts `#ar,#drawerCtl,#drawer,#scrim`, or a drawer nav) adds `body.entering` → CSS: `#stage` blurs to 28px, `#siteBody` (FIXED overlay, opacity 0→1 + `filter:blur(18px)→0`) blurs into view, hero prompts fade. After 950ms → `body.entered` + `live3D=false` → the loop stops (`if(!live3D) return`).
-  - Body/drawer/palette/`strings.js` ported 1:1 from desktop; `#siteBody` is FIXED overlay w/ opaque cold bg (`#070b16`). Drawer nav uses native `scrollIntoView` (no rail). Drawer height `100dvh`+`overflow-y:auto`+safe-area padding (fixed the WhatsApp clip).
-  - ❌ **Stage 4 (mobile beats + XRZENO finale during materialize) = SCRATCHED by Ed** — "small screen, too busy." Mobile hero forms the bottle silently, no beats, no finale. Do not re-add.
-- ✅ **Portfolio AR (both files).** model-viewer's default AR button suppressed (hidden `slot="ar-button"` child + `::part(default-ar-button){display:none}`); the **"View in your space"** link calls `model-viewer.activateAR()` on its card.
-- ✅ **Drawer social row (both files).** Instagram / TikTok / Threads / Facebook / X as inline brand-icon SVGs (self-contained), muted grey → warm-orange hover, `margin-top:auto` row above WhatsApp. ⚠️ **URLs are PLACEHOLDERS** (`instagram.com/xrzeno` etc.) — Ed supplies real handles.
-- ✅ **Body-life pass (both files).** Reveal-on-scroll (`.reveal`→`.in` via IntersectionObserver with **viewport root** — `#siteBody`-root didn't fire on the desktop scroll-lock) + staggered cards/steps + `.card:hover` lift. Respects `prefers-reduced-motion`. Fixed Ed's "hero alive, body goes flat" gripe.
-- ⚠️ **Git flakiness (environment):** `.git` writes intermittently fail (`Permission denied` on repack, `couldn't set 'refs/...'`) — almost certainly OneDrive/AV locking files under "WORK STUFF". Disabled `gc.auto 0` + `maintenance.auto false`. Pushes still reach GitHub; **verify with `git ls-remote origin` when a ref-write errors** (local tracking ref lags). Real fix = exclude `.git` from sync/AV or move the repo.
+### Desktop v3 — the new front door (`index_v3.html`, ACTIVE, 2026-07-10)
+Built off a copy of v2. The tokonoma/shinobu cinematic is DROPPED from the initial view (scene still loads +
+compiles, HIDDEN — feeds the load bar, preloads for a future "How it works"). Flow, all **native scroll**:
+1. **White loading hero** — big black `XRZENO` decodes L→R (matrix) and DOUBLES as the real load bar
+   (EXR+GLB byte progress → 0–90%, shader compile fills the last 10%, min 1.5s; cobalt cursor on the active
+   letter). White-on-black by design → high contrast for the reveal (INVERTS + kills the dark-on-dark the
+   Print Pass worried about).
+2. **Strips Print Pass** wipe (WebGL2 scrim `#bleed`, variant B, from `xrzeno-bleed-transition-demo-v2.html`):
+   the white hero is eaten strip-by-strip THROUGH the wordmark to print the body up. `STRIP_PX 34`,
+   `STRIP_WIPE 0.18`, SOD f2/ζ1/r0. Static-hash → scrub-reversible. `#release` runway removed so Real vs
+   Render sits right behind the scrim and prints up THROUGH the wipe.
+3. **Squiggle background** on `#liquidBg` — a noise→infinity loopy line (cobalt→warm `#1e40ff→#ff8a3d`,
+   HIGH mouse-pull, `blur(5px)`, **DPR-1**), scroll-driven top (messy tangle) → footer (steady emissive,
+   CLOSED ∞). Replaces the old metaball field. Figure-eight spine blended by structure; tip-taper +
+   closePath seals the ∞. Prototypes: `squiggle-scroll.html` (recipe) / `squiggle-demo.html` (sandbox).
+4. DOM **body** (cold Monture palette) + glass **drawer** — as v2, but now normal in-flow DOM.
+- **The scroll-lock is GONE in v3** (Ed's call). No `enterBodyLock`/`exitBodyLock`, no window wheel listener,
+  no `bodyP` fade, no fixed `#siteBody` overlay. The hidden 3D render loop is STOPPED after load (`v3Idle`).
+- ⚠️ **Mobile NOT ported** — v3 is desktop-only so far.
 
-## Session 2026-07-08 — body motion pass, text-static, auto-scroll reverted (committed `73eed99`, NOT pushed)
-- ✅ **Body "Lusion motion pass" (desktop + mobile).** Liquid metaball backdrop (2D canvas, cold palette, blur-melt + additive), **word-fly headers** (`h2` split into rising word clip-masks), **matrix-decode subheaders** (`.eyebrow` glyph-scramble resolve), reversible reveal-on-scroll (photos/cards/steps/FAQ/buttons/footer via `.reveal`→`.in`, IntersectionObserver **viewport** root), magnetic buttons, springy mouse parallax on the rail. A circular custom cursor was tried and **REJECTED** (fully removed).
-- ✅ **Body TEXT blurbs static (Ed).** Only `.lede` + `.note` stay static; header/subheader + **every other element animate** (photos, cards, steps, compare, FAQ, buttons, footer). First pass wrongly froze the cards/photos too — corrected to just the two text classes.
-- ❌ **Auto-scroll narrative REVERTED.** A wheel-driven auto-scroll for the hero (iterated many models: position-scrub → boost+decay → eased-speed+window → velocity+friction momentum, plus a diagnostic HUD) never felt right → dropped, back to native scroll. Root cause: the camera reads the damped `curJ` follower, so any velocity driver builds a backlog that discharges *after* release → feels inverted. **Next attempt must tie the camera to scroll POSITION (not integrated velocity); ref Lusion's astronaut piece.** Full experiment snapshot at scratchpad `index_v2.AUTOSCROLL-EXPERIMENT-backup.html`.
-- ⏳ **"Print Pass" strips-wipe hero→body transition** — owner-approved spec received 2026-07-08, acknowledged, **NOT built.** Blocked on the reference demo `xrzeno-bleed-transition-demo-v2.html`. Details in `handover.md` "NEXT" + CLAUDE-ADDENDUM gotcha #1.
-- 🧭 Working-style reminder: when a behavior can't be eyeballed, **instrument it (on-screen HUD)** instead of guessing — the auto-scroll bug was only pinned after a live readout was added.
+### v2 + mobile (prior, still valid — scroll-lock still LIVES here)
+- `index_v2.html` (three r0.169): hero cinematic (materialize → journey rail → clay→final PBR → pinned
+  beats SCAN/REBUILD/DELIVER → cold-night finale relight → XRZENO wordmark) → scroll-lock canvas-release
+  handoff → cold-palette DOM body + drawer. 5 rail camera stops live in `RAIL[]`; body "Lusion motion pass"
+  (word-fly h2, matrix-decode eyebrows, reversible reveals, magnetic buttons, springy parallax). `.lede` +
+  `.note` are the only STATIC text; everything else animates.
+- `index.html` (mobile, three r0.160): pinch-to-materialize → **TAP** anywhere to enter the site (scroll
+  fought the 1-finger orbit, so entry is a tap, NOT scroll). Bottle-only, no room/DOF/heavy bloom. Body +
+  drawer ported 1:1. Beats/finale during materialize were SCRATCHED (small screen, too busy).
 
-## Session 2026-07-10 — DESKTOP v3: new front door, squiggle bg, Print Pass, scroll-lock KILLED (committed+pushed `1e28664`)
-**Desktop-only this session (Ed's explicit instruction — don't touch mobile `index.html`).** New file `index_v3.html` (copy of v2), now the ACTIVE desktop truth file; v2 kept as fallback.
-- ✅ **Squiggle background (approved, prototyped first).** Recon'd Lusion (they open-sourced `WebGL-Scroll-Sync`); built a throwaway sandbox `squiggle-demo.html` (3 modes) → landed on a single **loopy line** whose 100%-noise wander felt "incidental" until given an authored **figure-eight spine** blended by a `Structure` slider (0=water wander → 1=clean ∞). Then a scroll-driven demo `squiggle-scroll.html`: TOP = big messy tangle of faint lines → scroll → extras fade, one lead line brightens+thickens+**emits**, motion steadies, noise tightens → BOTTOM = one steady emissive **closed ∞** (tip-taper + `closePath` seals it). Ed's colour = cobalt→warm `#1e40ff→#ff8a3d`. HIGH mouse-pull throughout. Look = `filter:blur(5px)` on the canvas (NOT a frosted/tinted backdrop plane — rejected as "still a veil"), **DPR-1** (blurred → retina wasted → ~4× cheaper render+blur; the pro move). Then INTEGRATED into v3 on `#liquidBg`, replacing the metaball field, driven by window scroll top→footer.
-- ✅ **White loading hero + real load bar.** Blue-bg idea flipped to **WHITE bg + BLACK XRZENO** (Ed: blue-on-blue strips would be mush; white→blue also INVERTS + kills the dark-on-dark the Print Pass worried about). `XRZENO` decodes L→R (matrix) and DOUBLES as the real load bar: EXR+GLB byte progress → 0–90%, shader compile fills the last 10%, min 1.5s, cobalt cursor on the active letter. The tokonoma cinematic is DROPPED from the initial view (scene still loads+compiles, HIDDEN — feeds the bar + preloads for How-it-works).
-- ✅ **Strips Print Pass built** (variant B, from Ed's `xrzeno-bleed-transition-demo-v2.html`, now in-repo). WebGL2 scrim `#bleed` (z150): the white hero is eaten strip-by-strip THROUGH the wordmark to print the body up. Static-hash → scrub-reversible. Ed loved that the wordmark flips/distorts as the strips cross it. `STRIP_PX 34`, `STRIP_WIPE 0.18`, SOD f2/ζ1/r0. `#release` runway removed so Real vs Render sits right behind the scrim and prints up THROUGH the wipe (was settling on empty then scrolling).
-- ✅ **SCROLL-LOCK ENTIRELY REMOVED in v3 (Ed's call: "no 3D scene, why not just scroll normally").** Deleted `enterBodyLock`/`exitBodyLock`, the window wheel listener, `bodyP` fades, the fixed `#siteBody` overlay → `#siteBody` is normal in-flow DOM on native scroll. Hidden 3D render loop STOPPED after load (`v3Idle`). This fixed a nasty **scroll-up stall** (mouse-move un-stuck it): root causes were (a) a **non-passive `wheel` listener on `window`** disabling Chrome's compositor scrolling page-wide, and (b) OrbitControls on the `pointer-events:auto` hidden canvas eating the wheel. Lesson: keep idle canvases `pointer-events:none`; no window wheel handlers.
-- ✅ **Reveal-on-scroll fixes** (broke when the loop stopped): observers now attach immediately (body always on-screen) instead of waiting for the deleted lock's `pointerEvents:auto`; and **hysteresis** (show ≥12%, hide only when FULLY out) killed the edge-jitter (the reveal `translateY` was re-tripping a single threshold). Rounded corners on image surfaces (compare/cards/viewers).
-- ⏳ **Polish open:** intro→scrim wordmark alignment at the handoff; strip/wipe/edge-tint feel; static-behind-wipe (sticky pin) vs print-up (current). **Mobile still on the old model — not ported.**
+## NEXT
+- ✅ Done 2026-07-10: squiggle bg, white loading hero, **Print Pass strips-wipe**, scroll-lock removed. The
+  old "hero scroll rework via Lusion astronaut" is **moot** — v3 replaced that whole hero.
+1. **Port v3 to MOBILE** (`index.html` still on the old tap model). Apply the "does this port cheaply?" check.
+2. **"How it works" 3D** — bring the bottle back HERE (Ed's plan: shinobu demoted from hero to a section).
+   Needs the v3 render loop re-enabled for that section only (undo `v3Idle` locally). See the 3D reference
+   below for the glass recipe / lean gotcha.
+3. **Real assets (Ed inputs):** portfolio GLB/USDZ for cards 2 & 3 (card 1 = bottle); the real photo+render
+   pair for the compare slider (SAME angle/framing or the trick dies — currently placeholder gradients);
+   real social handles for the 5 drawer icons (`instagram.com/xrzeno` etc. are placeholders).
+4. **Copy dash-sweep at finalization** — strip AI-dash tells from `strings.js` (EN+ID) + body copy.
+- **v3 polish open:** intro→scrim wordmark alignment at the handoff; strip/wipe/edge-tint feel;
+  static-behind-wipe (sticky pin) vs print-up-through (current).
 
-## Open items / gotchas
-- ✅ Steps 1–4 + dust flare + inspect/dolly + hint fix (2026-07-06); cold relight, scroll-lock handoff, body+palette, drawer (2026-07-07 day); perf freeze, parallax, full mobile build, portfolio AR, social links, body-life (2026-07-07 evening); **body Lusion motion pass + text-blurb-static + auto-scroll tried & reverted (2026-07-08, `73eed99`).** **Desktop + mobile are feature-complete pending assets. See `handover.md` "NEXT" for what's up next: hero scroll rework (Lusion astronaut), the Print Pass strips-wipe transition, and real assets.**
-- ⏳ **TOMORROW = ASSETS (Ed inputs):** portfolio GLB/USDZ for cards 2 & 3 (card 1 uses the bottle); the real photo+render pair for the compare slider (SAME angle/framing or the trick dies); real social handles. Plus the deferred **copy dash-sweep** on `strings.js` + body text at finalization.
-- **Keyboard scroll gap (desktop):** while scroll-locked in the site, space/PageDown/arrows won't scroll unless `#siteBody` is focused. Wheel/trackpad fine.
-- **Keyboard scroll gap:** while scroll-locked in the site, space/PageDown/arrows won't scroll unless `#siteBody` is focused (window is frozen). Wheel/trackpad fine.
-- ✅ Camera JSON captured — all 5 stops active in the re-sequenced rail (see Step 2).
-- Portfolio assets exist but are differently themed — uniform staging is the agreed fix.
-- Three.js version mismatch (0.160 vs 0.169) between the two files — converge when touching mobile.
-- Assets are relative paths — `index_v2.html` must sit next to `Tokonama Scene/` and the AR files. Test with `?stay` to override the device redirect.
-- The tray reflection probe was removed from the scene (comment ~line 356) but the `rebakeProbe()`/`window._trayProbe` plumbing remains — don't clean it up without asking first.
+## Load-bearing gotchas
+- **Reversibility rule (whole site):** drive camera/timeline/reveal from a scroll-**POSITION** scalar, read
+  fresh each frame, set state DIRECTLY. NEVER a per-frame `.lerp` follow or integrated velocity (lags
+  asymmetrically → breaks reverse-scroll). This is why the wheel-driven auto-scroll was reverted, and why
+  the rail reads a damped scalar (`curJ += (journeyP-curJ)*0.1`) then sets the pose directly.
+- **Scroll-lock is v2/mobile ONLY — v3 REMOVED it.** Don't port it into v3. (v2/mobile: `RAMP =
+  innerHeight*0.9` must match the `bodyP` denominator AND `#release`.)
+- **v3 scroll traps (cost real time):** a non-passive `wheel` listener on `window` disables Chrome's fast
+  compositor scroll page-wide (stalls until a mouse-move flushes it); OrbitControls on a `pointer-events`
+  canvas eats the wheel. Keep idle/hidden canvases `pointer-events:none`; no window wheel handlers.
+- **Reveal-on-scroll:** viewport IntersectionObserver root (not `#siteBody`). v3: observers attach
+  immediately (body always on-screen) + **hysteresis** (show ≥12%, hide only when fully out) or the reveal
+  `translateY` re-trips a single threshold → edge jitter.
+- A running CSS `animation` overrides inline `style.opacity` — hide pulsing elements with a class that sets
+  `animation:none`.
+- `--warm` is `#siteBody`-scoped; the drawer hardcodes `#ff8a3d` — keep in sync when tuning the orange.
+- Portfolio model-viewer AR button suppressed; "View in your space" calls `.activateAR()` on its card.
+- The tray reflection-probe was removed but `rebakeProbe()`/`window._trayProbe` plumbing remains — don't
+  clean it up without asking.
+
+## Design intent
+Premium product-viz studio. Cold Monture palette in the body (`--accent` cobalt `#1e40ff` for structure;
+warm `#ff8a3d` reserved for the ONE highlighted action — WhatsApp CTAs + the compare line). Frosted-glass
+non-highlighted buttons. Montserrat display. One bold move at a time; the object/idea is the hero.
+
+---
+
+## Deep-technical reference — the 3D bottle & scene (relevant when the bottle returns in How-it-works)
+
+**⚠️ THE BOTTLE LEAN IS LOAD-BEARING — cost a full day.** `wrap.rotation.x = -Math.PI/2*0.15` (~13.5°) is
+what makes the glass read as glass on the FRONT. A clear cylinder head-on/upright reflects only the dark
+void behind the camera → front looks flat/dead (physics, not a bug). If the front ever looks flat, **check
+the lean FIRST** before chasing lights/HDRI/normals (all red herrings last time).
+
+**Glass = FAKE-ALPHA recipe (the CORRECT tool for a solid cylinder, not a compromise):** black base +
+opacity **0.12** + roughness **0.04** + envMapIntensity **1.1** + FrontSide + `depthWrite:false`, with its
+OWN HDRI envMap so it reads glassy despite env=0. **NO softboxes / clearcoat / DoubleSide / point-lights /
+layers** (all tried, all worse).
+
+**Real transmission — VERDICT: do NOT retry on the bottle.** The bottle glass is a SOLID cylinder; real
+`MeshPhysicalMaterial` transmission treats a solid as a glass ROD/LENS → heavy distortion + grazing mirror
+rim + bright env = opaque white. It only works on HOLLOW thin-walled geometry. Translucent liquid-in-glass
+is also impossible in three's screen-space transmission (can't refract a second transmissive mesh; fresnel
+fake looks plastic → bake in Blender / path-trace only). Would need re-modelling hollow to reconsider.
+
+**compileAsync warm-up (THE first-form-stutter fix):** `renderer.compile()`+render does NOT block with
+`KHR_parallel_shader_compile` — the link finalizes on first real use → hitch. Fix = `await
+renderer.compileAsync(scene,camera)` in the warm-up, covering the formed + dust states.
+
+**Bloom must be a native composer pass** (`composite → bloom → OutputPass`) — manual `bloom.render()` never
+composites the glow. Dust: bloom 0.85/0.45/0.2, `strength=0.85·(1−formed)`, `enabled=formed<1`.
+
+**AR assets (2K, compressed, built with usd-core + Pillow):** iOS `shinobu_2k_ar.usdz` (4.4MB, Quick Look,
+Safari-only), Android `shinobu_2k_ar.glb` (5.1MB, Scene Viewer), desktop = toast. 4K source originals in git
+history at `8e1f42e^` if a rebuild is needed.
+
+**Tokonoma scene (v2 lineage, `Tokonama Scene/` — note `%20` in URLs):** `shinobu_tokonoma.glb` + 2K EXR
+HDRI. Baked lights (shoji SpotLight lattice + museum down-spot, env intensity 0). Mask-blur DOF (bottle
+sharp via silhouette mask). Ambient dust motes (~300 additive, beam-flare off the shoji shaft) = the "static
+scene" fix — a fixed diorama + locked camera has no perpetual motion, so the dust supplies it. `dustPivot`
+spirals-in and unwinds to a clean lock by 70%.
+
+**Tuning knobs:** point size `0.011`; bloom `(0.85,0.45,0.2)`; glass `opacity 0.12 / rough 0.04 / env 1.1`;
+exposure 0.95; the lean `-Math.PI/2*0.15` (leave it). Debug hotkeys in v2/v3 module: **C** log camera JSON,
+D toggle DOF, R reset cam, `[` `]` exposure, E cycle env, B toggle HDRI bg.
+
+**Dead ends — do NOT reopen:** real transmission on the solid bottle · half-res bloom (flickery) ·
+composer↔direct render switch (stutter) · reflection probe on the lacquer tray (washed it pale) · the
+softbox/clearcoat/point-light/normal-flip glass chase · the wheel-driven auto-scroll (velocity backlog) ·
+a flavor-text scrim (text-shadow won) · the raster JPEG logo ("tacky") · SCAN wireframe state ("too jarring").
