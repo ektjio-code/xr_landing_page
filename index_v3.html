@@ -43,8 +43,8 @@
   #scrim.on{opacity:1;pointer-events:auto}
   #ar{position:fixed;z-index:30;bottom:9%;left:50%;transform:translateX(-50%) translateY(12px);opacity:0;transition:opacity .6s,transform .6s;pointer-events:none}
   #ar.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
-  #ar button{background:transparent;color:var(--ink);border:1px solid rgba(232,160,92,.55);padding:15px 30px;border-radius:100px;font-size:15px;letter-spacing:.02em;cursor:pointer;font-family:inherit;transition:background .3s,border-color .3s;backdrop-filter:blur(6px)}
-  #ar button:hover{background:rgba(232,160,92,.12);border-color:var(--accent)}
+  #ar button{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.30);padding:14px 30px;border-radius:100px;font-size:15px;font-weight:600;letter-spacing:.02em;cursor:pointer;font-family:inherit;transition:background .3s,border-color .3s;-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);box-shadow:0 8px 30px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.35)}   /* iOS-style frosted glass pill */
+  #ar button:hover{background:rgba(255,255,255,.20);border-color:rgba(255,255,255,.48)}
   #hint{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:40;color:var(--muted);font-size:12px;letter-spacing:.18em;text-transform:uppercase;animation:fade 2.6s infinite;transition:opacity .4s}
   #hint.gone{opacity:0;animation:none}   /* stop the pulse so it truly hides — the animation was overriding inline opacity */
   @keyframes fade{0%,100%{opacity:.3}50%{opacity:.8}}
@@ -62,7 +62,7 @@
   .beat{position:absolute;opacity:0;color:var(--ink);text-transform:uppercase;will-change:opacity,filter}
   .beat-tr{top:13vh;right:6vw;text-align:right;font-family:'Montserrat',system-ui,sans-serif;font-size:clamp(2.7rem,6vw,4.8rem);letter-spacing:.1em;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5),0 4px 30px rgba(0,0,0,.5)}
   .beat-final{top:14vh;left:50%;transform:translateX(-50%);text-align:center;line-height:1.02;opacity:1}
-  .beat-final .d-lead{display:block;font-family:'Montserrat',system-ui,sans-serif;font-size:clamp(1.7rem,4vw,3rem);letter-spacing:.18em;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5),0 4px 30px rgba(0,0,0,.5)}
+  .beat-final .d-lead{display:block;font-family:'Montserrat',system-ui,sans-serif;font-size:clamp(2.7rem,6vw,4.8rem);letter-spacing:.1em;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5),0 4px 30px rgba(0,0,0,.5)}  /* v3: matched to .beat-tr (Scan/Rebuild) size */
   /* XRZENO wordmark: appears LAST, focus-sweeps L→R. Two stacked layers (blurred + sharp-masked), same gradient. */
   .beat-final .d-brand{position:relative;display:inline-block;margin-top:.28em;opacity:0;font-family:'Montserrat',system-ui,sans-serif;font-size:clamp(3.4rem,13vw,8.4rem);font-weight:800;letter-spacing:.04em}
   .beat-final .d-brand span{display:block;background:#ffffff;-webkit-background-clip:text;background-clip:text;color:transparent} /* solid white wordmark — gradient drowned in the cold bg */
@@ -177,8 +177,13 @@
   @keyframes introPulse{0%,100%{opacity:.4}50%{opacity:.9}}
   /* v3: lose the tokonoma hero — the scene still loads/compiles (drives the bar + preloads for How-it-works), just isn't shown */
   body{background:#0a1633}
-  #gl{opacity:0;pointer-events:none}
-  #coolVeil,#beats,#beatScrim,#hint,#ar{display:none!important}
+  #gl{opacity:0;pointer-events:none;z-index:4}   /* v3: raised above the body — the tokonoma scene shows OVER the site during How-it-works; opacity driven by the #process section */
+  #coolVeil,#hint{display:none!important}   /* v3: #ar ("View in 3D") is un-hidden — it's the already-wired inspect pill, shown at the bottom of the fullscreen scene */
+  /* v3 How-it-works: heading at top, an EMBEDDED scene window (Lusion astronaut framing) directly under it, then a tall runway; the resume copy is pushed to the very bottom (site continues after the scene). */
+  #process{min-height:440vh;position:relative}
+  #sceneStage{position:sticky;top:0;height:100vh;display:flex;align-items:center;justify-content:center}   /* pins the card at viewport centre while the runway scrolls → the windowed scene stays PUT (content no longer slides under the moving crop) */
+  #sceneWindow{width:min(62vw,900px);height:64vh;border-radius:16px}   /* the card the fixed canvas clip-path tracks; expand → fullscreen is a TIME tween (see winExpand), NOT scroll-scrubbed */
+  #processResume{position:absolute;left:0;right:0;bottom:0}   /* "Typical turnaround…" at the very end of the runway = the site resuming after the scene */
 </style>
 </head>
 <body>
@@ -213,7 +218,7 @@
   </div>
   <a href="#" class="d-wa" id="drawerWA" target="_blank" rel="noopener" data-i18n="drawer.whatsapp">Chat on WhatsApp</a>
 </nav>
-<div id="ar"><button id="arBtn">View 3D Model</button></div>
+<div id="ar"><button id="arBtn">View in 3D</button></div>
 <div id="hint">Scroll to materialize ↓</div>
 <div id="beatScrim" aria-hidden="true"></div>
 <div id="beats" aria-hidden="true">
@@ -278,12 +283,11 @@
 <section class="sect" id="process">
   <div class="wrap">
     <div class="eyebrow" data-i18n="process.eyebrow">How it works</div>
-    <h2 data-i18n="process.title">Scan. Rebuild. Deliver.</h2>
-    <div class="steps">
-      <div class="step"><h3 data-i18n="process.step1.title">Scan</h3><p data-i18n="process.step1.body"></p></div>
-      <div class="step"><h3 data-i18n="process.step2.title">Rebuild</h3><p data-i18n="process.step2.body"></p></div>
-      <div class="step"><h3 data-i18n="process.step3.title">Deliver</h3><p data-i18n="process.step3.body"></p></div>
-    </div>
+  </div>
+  <!-- v3: the embedded scene window (Lusion astronaut framing) — a sticky stage PINS the card at viewport centre; the fixed #gl canvas is clip-path'd to the card box, so it reads as a card in the page that opens to fullscreen on a time tween once scroll reaches it -->
+  <div id="sceneStage" aria-hidden="true"><div id="sceneWindow"></div></div>
+  <!-- v3: resume point — pushed to the bottom of the 360vh runway; the site "continues from Typical turnaround…" once the scene has played + wiped out -->
+  <div class="wrap" id="processResume">
     <p class="note" data-i18n="process.note"></p>
   </div>
 </section>
@@ -567,7 +571,11 @@ const COUNT = isMobile ? 16000 : 36000;
 let bottleMeshes=[], setMeshes=[], glassMats=[], bodyMeshes=[], glassMeshes=[], clayOverlays=[], points=null, pointGeo=null, homePos=null, scatterPos=null, modelReady=false, probeBaked=false, dustPivot=null;
 let targetF=0, curF=0, curJ=0, xrReveal=0, deliverFade=0, bodyP=0, lastFormF=-1;   // curJ rail scalar; xrReveal finale reveal; deliverFade DELIVER retire; bodyP canvas-release (0 narrative → 1 body)
 const trackEl = document.getElementById('track');
-function scrollProgress(){ const sc=trackEl.offsetHeight-innerHeight; return sc>0?clamp(scrollY/sc):0; }
+const processEl = document.getElementById('process');
+const sceneWindowEl = document.getElementById('sceneWindow');   // the inline card the canvas clip-path tracks (Lusion astronaut window→fullscreen)
+const processResumeEl = document.getElementById('processResume');   // the "Typical turnaround…" resume — pinned + revealed through the Pass-2 exit wipe
+// v3: the cinematic is driven by scroll THROUGH the #process (How-it-works) section, not the page hero track. 0 as its top hits the viewport top → 1 as its bottom reaches the viewport bottom.
+function scrollProgress(){ const r=processEl.getBoundingClientRect(); const sc=r.height-innerHeight; return sc>0?clamp(-r.top/sc):0; }
 // ===== PROGRESS SPLIT: raw scroll 0..SPLIT drives the materialize, SPLIT..1 drives the journey =====
 const SPLIT = 0.5;   // 50% of 600vh scrollable = 300vh for materialize — identical pacing to the old 400vh track
 let journeyP = 0;    // 0..1 across the journey range — drives the camera rail (Step 2)
@@ -820,8 +828,7 @@ new GLTFLoader().load('Tokonama%20Scene/shinobu_tokonoma.glb', async (gltf)=>{
   lastFormF = -1; setForm(0);
 
   loader.classList.add('hide');
-  introFinish();   // v3: geometry + shaders compiled → fill the intro bar to 100%
-  v3Idle = true;   // v3: scene is compiled but HIDDEN — stop the render loop entirely (frees the main thread → smooth native scroll). Re-enable when How-it-works needs the 3D.
+  introFinish();   // v3: geometry + shaders compiled → fill the intro bar to 100% (Lusion: compile up front). The loop stays paused until the How-it-works section scrolls into view.
 }, (e)=>{ if(e.total){ gltfP=e.loaded/e.total; introAssets(); loader.textContent = 'loading… ' + Math.min(100, Math.round(e.loaded/e.total*100)) + '%'; } },
    (err)=>{ loader.textContent = 'FAILED: ' + err; console.error(err); introFinish(); });   // v3: don't hang the gate on failure
 
@@ -914,13 +921,13 @@ function updateBrand(p){                                        // XRZENO: appea
 }
 function updateBeats(p){
   const now = performance.now();
-  const bScan = beatBand(p, 0.02, 0.10, 0.16, 0.24);           // #4 opening (clay just formed)
+  const bScan = beatBand(p, 0.02, 0.08, 0.26, 0.33);           // #4 opening (clay just formed) — v3: WIDE resolved plateau (0.08–0.26). SCAN sits at the fast-ramping start of the journey, so a narrow plateau got skipped between frames → "never landed". Wide hold guarantees a resolved frame is drawn.
   const bReb  = beatBand(p, 0.30, 0.40, 0.50, 0.60);           // #2 → #3 (clay resolves, red mask reads)
   showBeat(beatScan, bScan);     drawDecode(decScan, bScan, now);   // Scan — decodes out of noise as it focuses in
   showBeat(beatRebuild, bReb);   drawDecode(decReb, bReb, now);     // Rebuild — decodes
   updateBrand(p);                                              // XRZENO last (updates xrReveal), once the camera is settled
   deliverFade += ((xrReveal > 0.97 ? 1 : 0) - deliverFade) * 0.015;      // once XRZENO is formed, DELIVER slowly retires — no interaction
-  const bLead = beatBand(p, 0.72, 0.84, 2, 3) * (1 - deliverFade);       // comes in on the pull-back, then auto-fades out
+  const bLead = beatBand(p, 0.70, 0.80, 0.92, 0.99);       // v3: Deliver comes in on the pull-back, then fades OUT before the journey's final frame. (Was beatBand(…,2,3)*(1-deliverFade) → held at 1 forever since the finale/deliverFade is dropped → stuck over the whole site.)
   showBeat(beatLead, bLead);     drawDecode(decLead, bLead, now);   // Deliver — decodes in, then dissolves back to noise as it retires
   beatScrim.style.opacity = (xrReveal * 0.45 * (1-bodyP)).toFixed(3);   // light scrim under the finale (also fades with the canvas release)
 }
@@ -937,13 +944,15 @@ function enterInspect(){
   inspectMode = true;
   controls.enableRotate = false; controls.enabled = false;      // dolly first; orbit switches on when it lands
   document.documentElement.style.overflow = 'hidden';           // freeze the page while inspecting
-  arBtn.textContent = 'Exit 3D View';
+  cv.style.pointerEvents = 'auto';                              // v3: canvas is normally pointer-events:none (so it doesn't eat the wheel); enable it here so OrbitControls gets the drag. Safe — the page is frozen, so no scroll to stall.
+  arBtn.textContent = 'Exit 3D';
   startTween(INSPECT_POS.clone(), INSPECT_TGT.clone(), ()=>{ controls.enableRotate = true; controls.enabled = true; });
 }
 function exitInspect(){
   inspectMode = false;
   controls.enableRotate = false; controls.enabled = false;
-  arBtn.textContent = 'View 3D Model';
+  cv.style.pointerEvents = 'none';                              // v3: restore — keep the wheel free once we're back to scroll-driven playback
+  arBtn.textContent = 'View in 3D';
   railPose(curJ);                                               // dolly back to the rail pose for the current scroll
   startTween(_railPos.clone(), _railTgt.clone(), ()=>{ document.documentElement.style.overflow = ''; });
 }
@@ -953,7 +962,7 @@ arBtn.addEventListener('click', ()=> inspectMode ? exitInspect() : enterInspect(
 // Once the site has fully faded in, FREEZE the page scroll and let #siteBody own scrolling — one active scroll zone (no window-vs-body desync, no pointer-events gesture-eating).
 // Pull up at the very top of the site → pop back into the narrative, which resumes easing from ~0.9.
 const RAMP = ()=> innerHeight*0.9;                       // bodyP ramp length (must match the bodyP formula + the #release height)
-let bodyLocked = false, rafPaused = false, v3Idle = false;   // v3: scroll-lock removed (no 3D scene to choreograph); v3Idle stops the hidden render loop after load
+let bodyLocked = false, rafPaused = false, sceneActive = false;   // v3: scroll-lock removed; sceneActive gates the render loop to the #process (How-it-works) section
 // v3: drawer nav → plain native smooth-scroll to the section (body is normal in-flow DOM now)
 window.__nav = (id)=>{ const t=document.getElementById(id); if(t) t.scrollIntoView({behavior:'smooth', block:'start'}); };
 // v3: the white loading hero fades over the first slice of scroll (reversible); the strips scrim carries the identical white+XRZENO, so it's a seamless handoff. Passive → never gates scroll.
@@ -977,17 +986,30 @@ function applyParallax(scale){               // reads the spring (ticked every f
   camera.position.copy(controls.target).add(_pOff);
 }
 let _pLast = performance.now();              // dt clock for the springs
+let winExpand = 0;   // v3 Lusion framing: card→fullscreen progress, eased on a TIME clock (not scroll) so the open is smooth, never scroll stop-and-go
 
 function loop(){
-  if(v3Idle) return;   // v3: scene compiled + hidden → loop is dead weight; stop rendering the invisible 3D
+  if(!sceneActive){ rafPaused=true; cv.style.opacity='0'; arEl.classList.remove('show'); return; }   // v3: render ONLY while How-it-works is on screen; pill hidden with it
   const _now = performance.now(); let _dt = (_now - _pLast)/1000; _pLast = _now; _dt = _dt>0 ? Math.min(_dt, 1/30) : 1/60;
   mouseSpring.update(_dt, _mTarget);                          // parallax spring ticks every frame → never jumps when re-entering the journey
-  if(!isMobile && !inspectMode) targetF = splitProgress();   // desktop scroll drives form; frozen while inspecting
+  const sp = (!isMobile && !inspectMode) ? scrollProgress() : 0;   // scroll THROUGH the How-it-works section
+  if(!isMobile && !inspectMode){ targetF = clamp((sp-0.15)/0.25); journeyP = clamp((sp-0.40)/0.27); }  // window .00–.05 · sun holds to .15 · materialize .15–.40 · journey .40–.67 · LONG exit .67–1 (soft strips, ~3× the old exit scroll)
+  // The EXPAND is TIME-driven: scroll only ARMS it (crossing the card's level sets the target); winExpand eases to it on the dt clock → gentle, smooth, symmetric on reverse. NEVER scrubbed by scroll delta (that's the stop-and-go Ed rejected).
+  const wantExpand = (inspectMode || tween) ? 1 : (sp > 0.05 ? 1 : 0);   // 3D view / dolly = always fullscreen (sp is forced 0 during inspect, which would otherwise collapse the window)
+  winExpand += (wantExpand - winExpand) * (1 - Math.pow(0.012, _dt));   // ~0.7s ease, framerate-independent
+  if(inspectMode) winExpand = 1;   // hard-hold fullscreen in the 3D view — never let it revert to the window
+  if(Math.abs(wantExpand - winExpand) < 0.0006) winExpand = wantExpand;
+  const expand = winExpand;   // 0 = embedded pinned window + still "sun" (no spin) · 1 = fullscreen + spun-up
   curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
   curJ += (journeyP-curJ)*0.1; if(Math.abs(journeyP-curJ)<0.0004) curJ=journeyP;   // damped, but the pose is read from curJ → reversible
   bodyP = clamp((scrollY - (trackEl.offsetHeight - innerHeight)) / (innerHeight*0.9));  // (kept for the hidden scene's own relight math; no longer gates scroll)
   setForm(curF);
-  if(dustPivot){ const u = 1 - clamp(curF/0.7); dustPivot.rotation.y = u*1.3 + performance.now()*0.00006*u; } // index2-style swirl: spiral-in + drift, unwinds to a clean lock by 70%
+  if(dustPivot){ const u = 1 - clamp(curF/0.7); dustPivot.rotation.y = expand*(u*1.3 + performance.now()*0.00006*u); } // v3: NO spin in the window/sun phase (expand=0); spins up as it expands
+  // v3 "sun": a compact glowing ball FRAMED in the card when windowed (expand 0) → opens to the full scatter shell (expand 1). A slow time PULSE keeps it alive (breathing light + glow), strongest while windowed — never a still frame.
+  const sunPulse = 1 + 0.06*Math.sin(performance.now()*0.0016);
+  if(points){ points.scale.setScalar((0.10 + 0.90*expand) * (expand<0.99 ? sunPulse : 1));
+    // dim + warm ONLY while windowed: MULTIPLY the fade setForm already applied (0.9*(1-meshIn)) — never overwrite it, or the dust stays bright and speckles the formed bottle. Low factor keeps the additive stack from clipping to white → warm amber sun; hands opacity fully back to setForm once open.
+    if(points.material && expand<0.995){ const dim = (0.33 + 0.67*expand) * (0.86 + 0.14*Math.sin(performance.now()*0.0016)); points.material.opacity *= dim; } }
   if(window._dust){ const D=window._dust; const din=clamp((curF-0.6)/0.4); D.mat.opacity = 0.55*din; // ambient dust fades in with the scene, then drifts forever
     if(din>0.001){ const p=D.pos, col=D.col, tSec=performance.now()*0.001;
       for(let i=0,n=p.length/3;i<n;i++){ const j=i*3;
@@ -1004,7 +1026,7 @@ function loop(){
     }
   }
   blurOn = !inspectMode && modelReady && curF>0.92 && curJ<0.88;  // DOF off while inspecting + on the #5 wide deliver
-  arEl.classList.toggle('show', (inspectMode || curF>0.985) && bodyP<0.02); // after full materialization; hidden once the body is in view
+  arEl.classList.toggle('show', !isMobile && (inspectMode || (expand>0.9 && curF>0.9 && sp<0.67)));   // v3: "View in 3D" appears once the scene is fullscreen + formed; hides as the exit wipe starts (sp≥0.67) and when the scene deactivates
   hintEl.classList.toggle('gone', curF>0.92);        // gone at full formation (class kills the pulse; inline opacity was overridden by the animation)
   let revF = xrReveal;                               // reveal-factor: drives BOTH the lights-down dim AND the cold relight (so they stay in lockstep)
   if(tween){                                         // ===== DOLLY: smooth camera move into/out of inspect =====
@@ -1027,7 +1049,7 @@ function loop(){
     railPose(curJ);
     camera.position.copy(_railPos);
     controls.target.copy(_railTgt);
-    applyParallax(1 - smoothstep(clamp((curJ-0.82)/0.18)));  // full lean through the journey, eased to 0 into the #5 pull-back/finale
+    applyParallax(1 - smoothstep(clamp((curJ-0.82)/0.18)));  // full lean through the journey, eased to 0 into the #5 pull-back/finale — v2 wiring, verbatim
     camera.lookAt(controls.target);
     setJourneyMaterial(curJ);                        // Step 3: clay → final, in lockstep with the camera
     updateBeats(curJ);                               // Step 4: pinned beat text + finale
@@ -1039,32 +1061,62 @@ function loop(){
     updateBeats(curJ);
     renderer.toneMappingExposure = exposure * (1 - 0.55*xrReveal);
   }
-  // CANVAS RELEASE: the scene STAYS as an extremely blurred, cold "blobby" background; the site FADES IN over it (no scroll-up)
-  const narr = 1 - bodyP;
-  // (1) the FINALE relights the actual scene cold — warm spots ease to moonlight on the reveal-factor (genuine cold light, keeps every shadow/highlight; revF pins to 0 in 3D view)
+  // v3 How-it-works: NO finale — kill the XRZENO wordmark, the cold/blue relight, and the lights-down (warm throughout)
+  xrReveal = 0; revF = 0; beatBrand.style.opacity = '0'; renderer.toneMappingExposure = exposure;
   const cold = clamp(revF);
   spot.color.copy(SPOT_WARM).lerp(SPOT_COLD, cold);
   museum.color.copy(MUS_WARM).lerp(MUS_COLD, cold);
-  // (2) THEN, only as we scroll past the finale into the body, the veil takes over as the deep-blue background
-  const cool = clamp(bodyP);
-  coolVeilEl.style.opacity = (cool*0.72).toFixed(3);
-  cv.style.filter = bodyP>0.001 ? 'blur('+(bodyP*44).toFixed(1)+'px)' : 'none';   // heavy defocus → blobby field that becomes the site's background
-  cv.style.pointerEvents = 'none';   // v3: canvas is hidden — keep it OUT of the pointer path always, or OrbitControls eats the wheel when scrolling up into the hero (bodyP<0.4) → scroll stall until a mouse-move jars it loose
-  beatsEl.style.opacity = narr;                       // finale wordmark fades out
+  const wr = sceneWindowEl.getBoundingClientRect(), k = 1 - expand;
+  // v3 windowed "sun": compose the subject DEAD-CENTRE IN THE CARD — a framed camera shot, not a peephole crop.
+  //   (1) lookAt the cloud centre so it's the framed subject; (2) setViewOffset shifts the projection so that centre lands at the CARD's screen position (not the viewport centre) → the sun rides inside the card wherever the card is, both axes. Blends to normal as it opens.
+  if(dustPivot){ const w = clamp(1 - expand);
+    controls.target.lerp(dustPivot.position, w); camera.lookAt(controls.target);
+    if(w>0.001){ const cx=(wr.left+wr.right)/2, cy=(wr.top+wr.bottom)/2;   // card centre in CSS px
+      camera.setViewOffset(innerWidth, innerHeight, (innerWidth/2-cx)*w, (innerHeight/2-cy)*w, innerWidth, innerHeight); }
+    else camera.clearViewOffset(); }
+  // window → fullscreen (Lusion astronaut framing): clip to the card's LIVE rect, lerp out to the full viewport by `expand`. Held fullscreen through the exit; the CSS-mask strips below do the reveal.
+  const cT = Math.max(0, wr.top)*k, cL = Math.max(0, wr.left)*k,
+        cR = Math.max(0, innerWidth - wr.right)*k, cB = Math.max(0, innerHeight - wr.bottom)*k;
+  cv.style.clipPath = `inset(${cT.toFixed(1)}px ${cR.toFixed(1)}px ${cB.toFixed(1)}px ${cL.toFixed(1)}px round ${(16*k).toFixed(1)}px)`;
+  // ===== PASS 2 — EXIT WIPE: soft bars RISE UP the scene via a CSS mask (own seed) → soft-transparent columns reveal the next section scrolling up behind the fixed #gl. STRIP ONLY — no white, no scene-fade, no pinning. Isolated from the render pipeline. =====
+  const EX_START = 0.67, EX_STRIP = 24, EX_WIPE = 0.16, EX_FEATHER = 3.0;
+  const exitP = (!inspectMode) ? clamp((sp - EX_START)/(1 - EX_START)) : 0;
+  if(exitP > 0.0001){
+    const N = Math.max(1, Math.ceil(innerWidth/EX_STRIP)), img = [], pos = [], size = [];
+    for(let c = 0; c < N; c++){
+      const order = (Math.abs(Math.sin((c+1)*17.31))*43758.5453) % 1;   // per-column random order — own seed
+      const local = clamp((exitP - order*(1-EX_WIPE))/EX_WIPE);
+      const front = local*100;   // % up from bottom: transparent (reveals DOM) below, #000 (shows scene) above → soft feathered band at the front
+      img.push(`linear-gradient(to top, transparent ${(front-EX_FEATHER).toFixed(1)}%, #000 ${(front+EX_FEATHER).toFixed(1)}%)`);
+      pos.push(`${c*EX_STRIP}px 0`); size.push(`${EX_STRIP}px 100%`);
+    }
+    const mi = img.join(','), mp = pos.join(','), ms = size.join(',');
+    cv.style.webkitMaskImage = mi; cv.style.maskImage = mi;
+    cv.style.webkitMaskPosition = mp; cv.style.maskPosition = mp;
+    cv.style.webkitMaskSize = ms; cv.style.maskSize = ms;
+    cv.style.webkitMaskRepeat = 'no-repeat'; cv.style.maskRepeat = 'no-repeat';
+  } else if(cv.style.maskImage && cv.style.maskImage !== 'none'){
+    cv.style.webkitMaskImage = 'none'; cv.style.maskImage = 'none';   // clear when not exiting
+  }
+  // opacity: framed-sun fade-in on ENTRY only; the exit reveal is the alpha strips (no opacity fade).
+  const cCenterY = (wr.top + wr.bottom)/2;
+  const settle = clamp(1 - Math.abs(cCenterY - innerHeight/2)/(innerHeight*0.5));
+  cv.style.opacity = Math.max(0, Math.min(1, Math.max(settle, expand))).toFixed(3);
+  cv.style.filter = 'none';
   renderMaskBlur();
   const formed = clamp((curF-0.55)/0.45);            // bloom the dust embers — strength fades 0.85→0 as it forms
-  bloom.strength = 0.85 * (1 - formed);
+  bloom.strength = (0.85 + 0.14*(1-formed)*Math.sin(performance.now()*0.0016+1.2)) * (1 - formed) * (0.42 + 0.58*clamp(expand));   // v3: base bloom + slow breathe; DIMMED while windowed (×0.42) so the warm sun glows without blowing to white, back to full as it opens
   bloom.enabled  = modelReady && formed < 1;
   compositePass.uniforms.tSharp.value   = sharpRT.texture;
   compositePass.uniforms.tBlur.value    = blurB.texture;
   compositePass.uniforms.tMask.value    = maskFeather.texture;
   compositePass.uniforms.uEnabled.value = blurOn ? 1 : 0;
   composer.render();
-  // PERF FREEZE: once the scene is fully settled behind the locked site, stop the RAF. WebGL keeps showing the last frame (under its CSS blur) so the blobby background is unchanged; the whole loop just stops running behind the DOM site. Woken again by exitBodyLock / resize.
-  if(bodyLocked && curF>0.999 && curJ>0.999 && xrReveal>0.999){ rafPaused=true; return; }
   requestAnimationFrame(loop);
 }
-loop();
+loop();   // runs once, immediately pauses (sceneActive=false until How-it-works is in view)
+// v3: wake the render loop when the How-it-works section enters the viewport, let it self-pause when it leaves (Lusion "render only when visible")
+new IntersectionObserver(es=>es.forEach(e=>{ sceneActive = e.isIntersecting; if(sceneActive && rafPaused){ rafPaused=false; loop(); } }), {rootMargin:'30% 0px 30% 0px'}).observe(processEl);
 </script>
 
 <!-- ===== SITE BODY behaviors: i18n copy swap + compare slider (drawer is Step 2) ===== -->
@@ -1355,6 +1407,7 @@ try{(function(){
   loop();
 })();}catch(e){ console.warn('strips scrim off:',e); }
 </script>
+
 
 <!-- ===== SQUIGGLE BACKGROUND: noise→infinity loopy line, scroll-driven across the site (messy tangle at the top of the body → steady emissive ∞ at the footer). The persistent site bg; replaces the metaball field. blur(5px) softens it. ===== -->
 <script>
