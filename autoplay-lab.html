@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XRZENO · autoplay + scroll feel lab</title>
+<style>
+  :root{ --nav:#0a1633; --cobalt:#6f8dff; --warm:#ff8a3d; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--nav);
+    font-family:'Montserrat',system-ui,Segoe UI,sans-serif;color:#dfe6ff;cursor:default}
+  #c{position:fixed;inset:0;display:block}
+  #panel{position:fixed;top:14px;left:14px;z-index:10;background:rgba(10,18,42,.66);backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);border:1px solid rgba(120,150,255,.22);border-radius:12px;padding:14px 16px;width:270px}
+  #panel h1{font-size:13px;letter-spacing:.08em;margin:0 0 4px;font-weight:800}
+  #panel p{font-size:11.5px;line-height:1.55;color:#aab8e6;margin:0 0 12px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:9px 0;font-size:11.5px;color:#c7d3f5}
+  .row label{flex:0 0 118px}
+  .row input[type=range]{flex:1;accent-color:var(--cobalt)}
+  .row .val{flex:0 0 40px;text-align:right;color:var(--warm);font-variant-numeric:tabular-nums}
+  .row.chk{justify-content:flex-start;gap:8px} .row.chk input{accent-color:var(--warm)}
+  #hud{position:fixed;bottom:14px;left:14px;z-index:10;font:11px/1.5 ui-monospace,monospace;color:#8fa6df;
+    background:rgba(10,18,42,.55);padding:7px 11px;border-radius:8px;white-space:pre}
+  #hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10;font-size:12px;color:#aab8e6;
+    background:rgba(10,18,42,.55);padding:8px 16px;border-radius:8px}
+  b.k{color:var(--warm)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="panel">
+  <h1>AUTOPLAY + SCROLL</h1>
+  <p>The journey rides <b>one position target</b>. Scroll <b>sets the direction</b> and the autoplay keeps drifting that way: scroll down → keeps playing forward, scroll up → keeps rewinding. Damped → smooth &amp; reversible, no velocity backlog.</p>
+  <div class="row chk"><input type="checkbox" id="auto" checked><label for="auto" style="flex:1">Autoplay (directional drift)</label></div>
+  <div class="row"><label>Autoplay speed</label><input type="range" id="sSpeed" min="0" max="0.30" step="0.005" value="0.11"><span class="val" id="vSpeed"></span></div>
+  <div class="row"><label>Scroll gain</label><input type="range" id="sGain" min="0" max="0.0018" step="0.00005" value="0.0007"><span class="val" id="vGain"></span></div>
+  <div class="row"><label>Damping</label><input type="range" id="sDamp" min="0.02" max="0.30" step="0.005" value="0.09"><span class="val" id="vDamp"></span></div>
+</div>
+<div id="hud"></div>
+<div id="hint">Scroll <b class="k">down</b> → autoplays forward · scroll <b class="k">up</b> → autoplays in reverse · it keeps going on its own</div>
+
+<script>
+const TAU=Math.PI*2;
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+let W,H,DPR;
+function size(){ DPR=Math.min(devicePixelRatio||1,2); W=innerWidth; H=innerHeight;
+  cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); cv.style.width=W+'px'; cv.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0); }
+size(); addEventListener('resize',size);
+
+// ---- controls ----
+const el=id=>document.getElementById(id);
+const cfg={ auto:true, speed:0.11, gain:0.0007, damp:0.09 };
+function bind(id,key,fmt){ const s=el(id), v=el('v'+id.slice(1)); const upd=()=>{ cfg[key]=parseFloat(s.value); if(v) v.textContent=fmt(cfg[key]); }; s.addEventListener('input',upd); upd(); }
+bind('sSpeed','speed',x=>x.toFixed(3)); bind('sGain','gain',x=>x.toFixed(4)); bind('sDamp','damp',x=>x.toFixed(2));
+el('auto').addEventListener('change',e=>cfg.auto=e.target.checked);
+
+// ---- the ONE target (position, not velocity). Scroll sets the autoplay DIRECTION + gives an immediate nudge; the drift then keeps carrying that way. ----
+let target=0, cur=0, dir=1;   // dir: +1 plays forward, -1 rewinds
+addEventListener('wheel', e=>{ e.preventDefault();
+  if(e.deltaY>0) dir=1; else if(e.deltaY<0) dir=-1;   // scroll direction = playback direction
+  target += e.deltaY*cfg.gain;                         // immediate nudge so it responds at once
+}, {passive:false});
+const clamp=(v,a=0,b=1)=>v<a?a:v>b?b:v;
+
+// ---- gates (a ring of points per gate; fly through them) ----
+const NG=34, DOTS=44, SPACING=4.2, GR=3.0, FOCAL=340;
+const gates=[]; for(let i=0;i<NG;i++){ const ph=i*0.7; gates.push({z:i*SPACING, ph, warm:i/(NG-1)}); }
+const DEPTH=(NG-1)*SPACING;
+
+let last=performance.now();
+function frame(now){ const dt=Math.min(Math.max((now-last)/1000,1/240),1/30); last=now;
+  // autoplay drifts the target in the LAST-SCROLLED direction (forward or rewind), continuously
+  if(cfg.auto) target += cfg.speed*dt*dir;
+  target=clamp(target); cur += (target-cur)*cfg.damp; if(Math.abs(target-cur)<1e-4) cur=target;
+
+  ctx.fillStyle='#0a1633'; ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H/2, camZ=cur*DEPTH;
+  ctx.globalCompositeOperation='lighter';
+  for(const g of gates){ const dz=g.z-camZ;
+    if(dz<0.35 || dz>DEPTH*0.7) continue;
+    const sc=FOCAL/dz, rad=GR*sc, fade=clamp(1-dz/(DEPTH*0.7));
+    const wr=Math.round(90+g.warm*165), wg=Math.round(130+g.warm*20), wb=Math.round(255-g.warm*170);
+    for(let d=0;d<DOTS;d++){ const a=(d/DOTS)*TAU + g.ph + cur*0.6;
+      const x=cx+Math.cos(a)*rad, y=cy+Math.sin(a)*rad; if(x<-20||x>W+20||y<-20||y>H+20) continue;
+      const ds=Math.max(0.5, 2.4*sc*0.5);
+      ctx.fillStyle='rgba('+wr+','+wg+','+wb+','+(0.5*fade).toFixed(3)+')';
+      ctx.beginPath(); ctx.arc(x,y,ds,0,TAU); ctx.fill();
+    }
+  }
+  ctx.globalCompositeOperation='source-over';
+  const atEnd = (dir>0&&cur>=0.999)||(dir<0&&cur<=0.001);
+  el('hud').textContent = `cur    ${cur.toFixed(3)}\ntarget ${target.toFixed(3)}\ndir    ${dir>0?'▶ forward':'◀ rewind'}${atEnd?'  (at limit)':''}`;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
