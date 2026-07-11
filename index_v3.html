@@ -1092,10 +1092,8 @@ function loop(){
   const exitP = (!inspectMode) ? clamp((sp - EX_START)/(1 - EX_START)) : 0;   // 0 at .67 → 1 at footer; RAW here, damped inside the scrim
   _exitP = exitP;
   const exitFade = clamp(exitP/0.05);   // brief cross-hand: raw #gl fades to 0 as #bleed2 takes over. Almost nothing is eaten in this band, so both show ~the full scene → the swap is invisible.
-  // opacity: framed-sun fade-in on ENTRY only; during the exit, fade the raw #gl out so the scrim's eaten columns reveal the site (the scrim keeps presenting the scene in the KEPT columns).
-  const cCenterY = (wr.top + wr.bottom)/2;
-  const settle = clamp(1 - Math.abs(cCenterY - innerHeight/2)/(innerHeight*0.5));
-  cv.style.opacity = (Math.max(0, Math.min(1, Math.max(settle, expand))) * (1 - exitFade)).toFixed(3);
+  // opacity: the scene card is FULLY OPAQUE the whole time it's on screen (no settle-to-centre fade-in — Ed's call); only the exit fades it out as #bleed2 takes over.
+  cv.style.opacity = (1 - exitFade).toFixed(3);
   cv.style.filter = 'none';
   renderMaskBlur();
   const formed = clamp((curF-0.55)/0.45);            // bloom the dust embers — strength fades 0.85→0 as it forms
