@@ -178,12 +178,17 @@
   /* v3: lose the tokonoma hero — the scene still loads/compiles (drives the bar + preloads for How-it-works), just isn't shown */
   body{background:#0a1633}
   #gl{opacity:0;pointer-events:none;z-index:4}   /* v3: raised above the body — the tokonoma scene shows OVER the site during How-it-works; opacity driven by the #process section */
+  #bleed2{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none;display:none}   /* v3: EXIT strips scrim — Method-A shader ABOVE #gl (z5>z4). Samples the live scene + eats it → reveals the site. #gl fades to 0 during the exit so eaten columns show the DOM below. */
   #coolVeil,#hint{display:none!important}   /* v3: #ar ("View in 3D") is un-hidden — it's the already-wired inspect pill, shown at the bottom of the fullscreen scene */
   /* v3 How-it-works: heading at top, an EMBEDDED scene window (Lusion astronaut framing) directly under it, then a tall runway; the resume copy is pushed to the very bottom (site continues after the scene). */
   #process{min-height:440vh;position:relative}
   #sceneStage{position:sticky;top:0;height:100vh;display:flex;align-items:center;justify-content:center}   /* pins the card at viewport centre while the runway scrolls → the windowed scene stays PUT (content no longer slides under the moving crop) */
   #sceneWindow{width:min(62vw,900px);height:64vh;border-radius:16px}   /* the card the fixed canvas clip-path tracks; expand → fullscreen is a TIME tween (see winExpand), NOT scroll-scrubbed */
-  #processResume{position:absolute;left:0;right:0;bottom:0}   /* "Typical turnaround…" at the very end of the runway = the site resuming after the scene */
+  /* v3: FAQ reveal-in-place. #faqReveal overlaps the scene's final screen (--faq-overlap) so the FAQ is already pinned BEHIND the fullscreen scene BEFORE the bars start; #faq sticks to top:0 → the exit strips uncover it in place (no scroll-slide). It holds for --faq-pin, then releases into normal scroll (→ Contact). Both are eyeball knobs.
+     MATH: runway sp maps to ~340vh of scroll; wipe = sp .67→1.0 = the last ~112vh. overlap 240vh → pin starts ~sp .59 (safely before the bars); pin 180vh → holds through the wipe + ~40vh past, then releases. */
+  :root{--faq-overlap:240vh; --faq-pin:180vh}
+  #faqReveal{position:relative;margin-top:calc(-1 * var(--faq-overlap));height:calc(100vh + var(--faq-pin))}
+  #faqReveal>#faq{position:sticky;top:0;min-height:100vh;margin:0}   /* min-height fills the viewport so the strips reveal a full screen of FAQ; content keeps its natural size/top-flow (no flex-centering — that made the collapsed FAQ look shrunken) */
 </style>
 </head>
 <body>
@@ -196,7 +201,7 @@
 </div>
 <canvas id="bleed"></canvas><!-- v3: strips Print Pass scrim (WebGL2) — white hero eaten to reveal the site -->
 <canvas id="gl"></canvas>
-<div id="coolVeil" aria-hidden="true"></div>
+<canvas id="bleed2"></canvas><!-- v3: EXIT wipe (Method A) — a 2nd strips scrim that SAMPLES the live tokonoma render and eats it strip-by-strip to reveal the site below (z above #gl). Replaces the per-frame CSS mask. --><div id="coolVeil" aria-hidden="true"></div>
 <div id="track"></div>
 <div id="release" aria-hidden="true"></div>
 <div id="loader">loading scene…</div>
@@ -286,12 +291,10 @@
   </div>
   <!-- v3: the embedded scene window (Lusion astronaut framing) — a sticky stage PINS the card at viewport centre; the fixed #gl canvas is clip-path'd to the card box, so it reads as a card in the page that opens to fullscreen on a time tween once scroll reaches it -->
   <div id="sceneStage" aria-hidden="true"><div id="sceneWindow"></div></div>
-  <!-- v3: resume point — pushed to the bottom of the 360vh runway; the site "continues from Typical turnaround…" once the scene has played + wiped out -->
-  <div class="wrap" id="processResume">
-    <p class="note" data-i18n="process.note"></p>
-  </div>
 </section>
 
+<!-- v3: the exit strips reveal the FAQ IN PLACE. #faqReveal overlaps the scene's final screen (margin-top:-var(--faq-overlap)) and PINS the FAQ (sticky) behind the fullscreen scene, so the rising bars uncover it like a curtain off a poster — no scroll-slide. After the pin runway it releases into normal scroll (→ Contact). Knobs: --faq-overlap (when the pin starts, vs the wipe) / --faq-pin (how long it stays pinned). -->
+<div id="faqReveal">
 <section class="sect" id="faq">
   <div class="wrap faq">
     <div class="eyebrow" data-i18n="faq.eyebrow">FAQ</div>
@@ -304,6 +307,7 @@
     <details><summary data-i18n="faq.q6"></summary><p data-i18n="faq.a6"></p></details>
   </div>
 </section>
+</div>
 
 <section class="sect cta" id="contact">
   <div class="wrap">
@@ -573,7 +577,6 @@ let targetF=0, curF=0, curJ=0, xrReveal=0, deliverFade=0, bodyP=0, lastFormF=-1;
 const trackEl = document.getElementById('track');
 const processEl = document.getElementById('process');
 const sceneWindowEl = document.getElementById('sceneWindow');   // the inline card the canvas clip-path tracks (Lusion astronaut window→fullscreen)
-const processResumeEl = document.getElementById('processResume');   // the "Typical turnaround…" resume — pinned + revealed through the Pass-2 exit wipe
 // v3: the cinematic is driven by scroll THROUGH the #process (How-it-works) section, not the page hero track. 0 as its top hits the viewport top → 1 as its bottom reaches the viewport bottom.
 function scrollProgress(){ const r=processEl.getBoundingClientRect(); const sc=r.height-innerHeight; return sc>0?clamp(-r.top/sc):0; }
 // ===== PROGRESS SPLIT: raw scroll 0..SPLIT drives the materialize, SPLIT..1 drives the journey =====
@@ -987,9 +990,10 @@ function applyParallax(scale){               // reads the spring (ticked every f
 }
 let _pLast = performance.now();              // dt clock for the springs
 let winExpand = 0;   // v3 Lusion framing: card→fullscreen progress, eased on a TIME clock (not scroll) so the open is smooth, never scroll stop-and-go
+let _exitP = 0;      // v3: raw exit-wipe scalar (.67→1), handed to the #bleed2 scrim AFTER composer.render so the scrim samples a fresh scene frame
 
 function loop(){
-  if(!sceneActive){ rafPaused=true; cv.style.opacity='0'; arEl.classList.remove('show'); return; }   // v3: render ONLY while How-it-works is on screen; pill hidden with it
+  if(!sceneActive){ rafPaused=true; cv.style.opacity='0'; arEl.classList.remove('show'); if(window.__exitWipe) window.__exitWipe.hide(); return; }   // v3: render ONLY while How-it-works is on screen; pill + exit scrim hidden with it
   const _now = performance.now(); let _dt = (_now - _pLast)/1000; _pLast = _now; _dt = _dt>0 ? Math.min(_dt, 1/30) : 1/60;
   mouseSpring.update(_dt, _mTarget);                          // parallax spring ticks every frame → never jumps when re-entering the journey
   const sp = (!isMobile && !inspectMode) ? scrollProgress() : 0;   // scroll THROUGH the How-it-works section
@@ -1078,30 +1082,15 @@ function loop(){
   const cT = Math.max(0, wr.top)*k, cL = Math.max(0, wr.left)*k,
         cR = Math.max(0, innerWidth - wr.right)*k, cB = Math.max(0, innerHeight - wr.bottom)*k;
   cv.style.clipPath = `inset(${cT.toFixed(1)}px ${cR.toFixed(1)}px ${cB.toFixed(1)}px ${cL.toFixed(1)}px round ${(16*k).toFixed(1)}px)`;
-  // ===== PASS 2 — EXIT WIPE: soft bars RISE UP the scene via a CSS mask (own seed) → soft-transparent columns reveal the next section scrolling up behind the fixed #gl. STRIP ONLY — no white, no scene-fade, no pinning. Isolated from the render pipeline. =====
-  const EX_START = 0.67, EX_STRIP = 24, EX_WIPE = 0.16, EX_FEATHER = 3.0;
-  const exitP = (!inspectMode) ? clamp((sp - EX_START)/(1 - EX_START)) : 0;
-  if(exitP > 0.0001){
-    const N = Math.max(1, Math.ceil(innerWidth/EX_STRIP)), img = [], pos = [], size = [];
-    for(let c = 0; c < N; c++){
-      const order = (Math.abs(Math.sin((c+1)*17.31))*43758.5453) % 1;   // per-column random order — own seed
-      const local = clamp((exitP - order*(1-EX_WIPE))/EX_WIPE);
-      const front = local*100;   // % up from bottom: transparent (reveals DOM) below, #000 (shows scene) above → soft feathered band at the front
-      img.push(`linear-gradient(to top, transparent ${(front-EX_FEATHER).toFixed(1)}%, #000 ${(front+EX_FEATHER).toFixed(1)}%)`);
-      pos.push(`${c*EX_STRIP}px 0`); size.push(`${EX_STRIP}px 100%`);
-    }
-    const mi = img.join(','), mp = pos.join(','), ms = size.join(',');
-    cv.style.webkitMaskImage = mi; cv.style.maskImage = mi;
-    cv.style.webkitMaskPosition = mp; cv.style.maskPosition = mp;
-    cv.style.webkitMaskSize = ms; cv.style.maskSize = ms;
-    cv.style.webkitMaskRepeat = 'no-repeat'; cv.style.maskRepeat = 'no-repeat';
-  } else if(cv.style.maskImage && cv.style.maskImage !== 'none'){
-    cv.style.webkitMaskImage = 'none'; cv.style.maskImage = 'none';   // clear when not exiting
-  }
-  // opacity: framed-sun fade-in on ENTRY only; the exit reveal is the alpha strips (no opacity fade).
+  // ===== PASS 2 — EXIT WIPE (Method A): the strips now live in the #bleed2 shader scrim — it SAMPLES the live scene, eats it strip-by-strip (ink-edge + SOD glide, same engine as the load), and reveals the site below. Here we only compute the scroll scalar + hand #gl off to the scrim (drawn after composer.render, so it samples a fresh frame). =====
+  const EX_START = 0.67;
+  const exitP = (!inspectMode) ? clamp((sp - EX_START)/(1 - EX_START)) : 0;   // 0 at .67 → 1 at footer; RAW here, damped inside the scrim
+  _exitP = exitP;
+  const exitFade = clamp(exitP/0.05);   // brief cross-hand: raw #gl fades to 0 as #bleed2 takes over. Almost nothing is eaten in this band, so both show ~the full scene → the swap is invisible.
+  // opacity: framed-sun fade-in on ENTRY only; during the exit, fade the raw #gl out so the scrim's eaten columns reveal the site (the scrim keeps presenting the scene in the KEPT columns).
   const cCenterY = (wr.top + wr.bottom)/2;
   const settle = clamp(1 - Math.abs(cCenterY - innerHeight/2)/(innerHeight*0.5));
-  cv.style.opacity = Math.max(0, Math.min(1, Math.max(settle, expand))).toFixed(3);
+  cv.style.opacity = (Math.max(0, Math.min(1, Math.max(settle, expand))) * (1 - exitFade)).toFixed(3);
   cv.style.filter = 'none';
   renderMaskBlur();
   const formed = clamp((curF-0.55)/0.45);            // bloom the dust embers — strength fades 0.85→0 as it forms
@@ -1112,6 +1101,7 @@ function loop(){
   compositePass.uniforms.tMask.value    = maskFeather.texture;
   compositePass.uniforms.uEnabled.value = blurOn ? 1 : 0;
   composer.render();
+  if(window.__exitWipe) window.__exitWipe.frame(_exitP);   // v3: exit strips — draw AFTER the scene render so #bleed2 samples this fresh frame
   requestAnimationFrame(loop);
 }
 loop();   // runs once, immediately pauses (sceneActive=false until How-it-works is in view)
@@ -1406,6 +1396,95 @@ try{(function(){
   }
   loop();
 })();}catch(e){ console.warn('strips scrim off:',e); }
+</script>
+
+
+<!-- ===== EXIT WIPE (Method A) — #bleed2: a 2nd WebGL2 strips scrim that SAMPLES the live tokonoma render and eats it strip-by-strip to reveal the site below. Same shader family as the load #bleed (ink-edge + critically-damped SOD glide), own seed so the two wipes aren't carbon copies. Driven by the scene loop (drawn right AFTER composer.render → samples a fresh frame). Replaces the per-frame CSS mask (Method B). ===== -->
+<script>
+try{(function(){
+  const canvas=document.getElementById('bleed2'), glCanvas=document.getElementById('gl');
+  if(!canvas||!glCanvas) return;
+  const gl=canvas.getContext('webgl2',{alpha:true,antialias:false,premultipliedAlpha:true});
+  if(!gl){ return; }   // no webgl2 → leave __exitWipe undefined; #gl still fades out on exit (plain fallback, site still reachable)
+
+  // FEEL-TUNE — mirrors the load strips (Method A); own seed so the top + exit wipes aren't identical
+  const EX_STRIP_PX=34.0, EX_WIPE=0.18, EX_FEATHER=0.012, EX_TINT=0.22, EX_SEED=17.31;
+  const SOD_EXIT={f:2.0,z:1.0,r:0.0};   // critically damped — the same glide the load has
+
+  const VS=`#version 300 es
+  in vec2 aPos; out vec2 vUv;
+  void main(){ vUv=aPos*0.5+0.5; gl_Position=vec4(aPos,0.0,1.0); }`;
+
+  const FS=`#version 300 es
+  precision highp float;
+  in vec2 vUv; out vec4 outColor;
+  uniform sampler2D uScene; uniform vec2 uRes; uniform float uP;
+  float hash(float n){ return fract(sin(n*127.1)*43758.5453); }
+  void main(){
+    float x=vUv.x, y=vUv.y;                                  // y: 0 = bottom, the wipe rises
+    float strip=floor(x*uRes.x/${EX_STRIP_PX.toFixed(1)});
+    float order=hash(strip*${EX_SEED.toFixed(2)});           // per-column random order — own seed
+    float local=clamp((uP-order*(1.0-${EX_WIPE.toFixed(2)}))/${EX_WIPE.toFixed(2)},0.0,1.0);
+    float front=local*1.001;
+    float d=front-y;                                         // >0 : eaten here (transparent → the site shows through)
+    float eaten=smoothstep(0.0,${EX_FEATHER.toFixed(4)},d);
+    vec3 scene=texture(uScene, vUv).rgb;                     // the live tokonoma render, sampled THIS frame
+    float edge=smoothstep(${EX_FEATHER.toFixed(4)}*4.0,0.0,abs(d))*${EX_TINT.toFixed(2)};   // soft ink-edge hugging the wipe front (depth)
+    scene*=1.0-edge;
+    float alpha=1.0-eaten;                                   // eaten = transparent = the site shows
+    outColor=vec4(scene*alpha, alpha);                       // premultiplied
+  }`;
+
+  function compile(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(s); return s; }
+  const prog=gl.createProgram();
+  gl.attachShader(prog,compile(gl.VERTEX_SHADER,VS));
+  gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,FS));
+  gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) throw gl.getProgramInfoLog(prog);
+  gl.useProgram(prog);
+
+  const quad=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1, 3,-1, -1,3]),gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+  const U={}; for(const n of ['uScene','uRes','uP']) U[n]=gl.getUniformLocation(prog,n);
+  gl.uniform1i(U.uScene,0);
+
+  // scene texture — re-uploaded from the #gl canvas each drawn frame (the scene is opaque, so alpha=1 in the KEPT columns)
+  const sceneTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,sceneTex);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+
+  function resize(){ const dpr=Math.min(devicePixelRatio||1,2); canvas.width=Math.round(innerWidth*dpr); canvas.height=Math.round(innerHeight*dpr); gl.viewport(0,0,canvas.width,canvas.height); }
+  addEventListener('resize',resize); resize();
+
+  class SOD{ constructor(v,f,z,r){ this.k1=z/(Math.PI*f); this.k2=1/((2*Math.PI*f)**2); this.k3=r*z/(2*Math.PI*f); this.x=v; this.y=v; this.yd=0; }
+    update(dt,t){ const k2s=Math.max(this.k2, dt*dt/2+dt*this.k1/2, dt*this.k1); const xd=(t-this.x)/dt; this.x=t; this.y+=dt*this.yd; this.yd+=dt*(t+this.k3*xd-this.y-this.k1*this.yd)/k2s; return this.y; } }
+  const sod=new SOD(0,SOD_EXIT.f,SOD_EXIT.z,SOD_EXIT.r);
+
+  let lastT=performance.now(), shown=false, wasHidden=true;
+  function hide(){ if(shown){ canvas.style.display='none'; shown=false; } wasHidden=true; }
+
+  window.__exitWipe={
+    hide,
+    frame(rawExitP){
+      const now=performance.now(); const dt=Math.min(Math.max((now-lastT)/1000,1/240),1/30); lastT=now;
+      if(wasHidden){ sod.x=sod.y=rawExitP; sod.yd=0; wasHidden=false; }   // snap on re-entry → never ease up from a stale value
+      const p=Math.max(0, sod.update(dt, rawExitP));
+      if(p<0.0006 && rawExitP<0.0006){ hide(); return; }                 // not exiting → don't draw (the raw #gl shows the scene)
+      if(!shown){ canvas.style.display='block'; shown=true; }   // MUST be 'block', not '' — '' reverts to the CSS rule (#bleed2{display:none}) and the scrim never composites
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,sceneTex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
+      try{ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,glCanvas); }catch(e){}   // sample the fresh scene frame (called right after composer.render, same task → buffer valid)
+      gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.uniform2f(U.uRes,canvas.width,canvas.height);
+      gl.uniform1f(U.uP,p);
+      gl.drawArrays(gl.TRIANGLES,0,3);
+    }
+  };
+})();}catch(e){ console.warn('exit scrim off:',e); }
 </script>
 
 
