@@ -62,7 +62,7 @@
   .beat{position:absolute;opacity:0;color:var(--ink);text-transform:uppercase;will-change:opacity,filter}
   .beat-tr{top:13vh;right:6vw;text-align:right;font-family:'Montserrat',system-ui,sans-serif;font-size:clamp(2.7rem,6vw,4.8rem);letter-spacing:.1em;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5),0 4px 30px rgba(0,0,0,.5)}
   .beat-final{top:14vh;left:50%;transform:translateX(-50%);text-align:center;line-height:1.02;opacity:1}
-  .beat-final .d-lead{display:block;font-family:'Montserrat',system-ui,sans-serif;font-size:clamp(2.7rem,6vw,4.8rem);letter-spacing:.1em;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5),0 4px 30px rgba(0,0,0,.5)}  /* v3: matched to .beat-tr (Scan/Rebuild) size */
+  .beat-final .d-lead{display:block;opacity:0;font-family:'Montserrat',system-ui,sans-serif;font-size:clamp(2.7rem,6vw,4.8rem);letter-spacing:.1em;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5),0 4px 30px rgba(0,0,0,.5)}  /* v3: matched to .beat-tr (Scan/Rebuild) size. opacity:0 default — the journey reveals it via inline opacity; without this it flashed "DELIVER" at load (.beat-final overrides .beat's opacity:0). */
   /* XRZENO wordmark: appears LAST, focus-sweeps L→R. Two stacked layers (blurred + sharp-masked), same gradient. */
   .beat-final .d-brand{position:relative;display:inline-block;margin-top:.28em;opacity:0;font-family:'Montserrat',system-ui,sans-serif;font-size:clamp(3.4rem,13vw,8.4rem);font-weight:800;letter-spacing:.04em}
   .beat-final .d-brand span{display:block;background:#ffffff;-webkit-background-clip:text;background-clip:text;color:transparent} /* solid white wordmark — gradient drowned in the cold bg */
@@ -1488,81 +1488,40 @@ try{(function(){
 </script>
 
 
-<!-- ===== SQUIGGLE BACKGROUND: noise→infinity loopy line, scroll-driven across the site (messy tangle at the top of the body → steady emissive ∞ at the footer). The persistent site bg; replaces the metaball field. blur(5px) softens it. ===== -->
+<!-- ===== SCAN FIELD BACKGROUND: a soft dot-grid under the blurred #liquidBg plane. A slow warm hotspot drifts (ambient life, no scan bar), the cursor reveals dots locally, and lit dots EMIT (additive) cobalt → warm #ff8a3d. Replaces the noise→infinity squiggle. DPR-1 + blur(5px). Light on budget (~1-2ms/frame, no per-pixel work). ===== -->
 <script>
 try{(function(){
-  const cv=document.getElementById('liquidBg'), root=document.getElementById('siteBody'), site=root; if(!cv||!root) return;
+  const cv=document.getElementById('liquidBg'); if(!cv) return;
   const ctx=cv.getContext('2d'); let W=1,H=1;
   function size(){ W=cv.width=Math.max(1,innerWidth); H=cv.height=Math.max(1,innerHeight); cv.style.width=innerWidth+'px'; cv.style.height=innerHeight+'px'; } // DPR=1: it's blurred, retina is wasted
   size(); addEventListener('resize',size);
+  const TAU=Math.PI*2, GAP=46;
 
-  // --- compact 3D simplex noise (Gustavson, public domain) ---
-  const Grad=[[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
-  const p8=new Uint8Array(256);(function(){const s=[];for(let i=0;i<256;i++)s[i]=i;let seed=1337;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};for(let i=255;i>0;i--){const j=Math.floor(rnd()*(i+1));[s[i],s[j]]=[s[j],s[i]];}for(let i=0;i<256;i++)p8[i]=s[i];})();
-  const perm=new Uint8Array(512),pm12=new Uint8Array(512);for(let i=0;i<512;i++){perm[i]=p8[i&255];pm12[i]=perm[i]%12;}
-  const F3=1/3,G3=1/6;
-  function noise3(x,y,z){ let n0,n1,n2,n3;
-    const s=(x+y+z)*F3,i=Math.floor(x+s),j=Math.floor(y+s),k=Math.floor(z+s);
-    const t=(i+j+k)*G3,X0=i-t,Y0=j-t,Z0=k-t,x0=x-X0,y0=y-Y0,z0=z-Z0;
-    let i1,j1,k1,i2,j2,k2;
-    if(x0>=y0){ if(y0>=z0){i1=1;j1=0;k1=0;i2=1;j2=1;k2=0;} else if(x0>=z0){i1=1;j1=0;k1=0;i2=1;j2=0;k2=1;} else{i1=0;j1=0;k1=1;i2=1;j2=0;k2=1;} }
-    else{ if(y0<z0){i1=0;j1=0;k1=1;i2=0;j2=1;k2=1;} else if(x0<z0){i1=0;j1=1;k1=0;i2=0;j2=1;k2=1;} else{i1=0;j1=1;k1=0;i2=1;j2=1;k2=0;} }
-    const x1=x0-i1+G3,y1=y0-j1+G3,z1=z0-k1+G3,x2=x0-i2+2*G3,y2=y0-j2+2*G3,z2=z0-k2+2*G3,x3=x0-1+3*G3,y3=y0-1+3*G3,z3=z0-1+3*G3;
-    const ii=i&255,jj=j&255,kk=k&255;
-    let tt=0.6-x0*x0-y0*y0-z0*z0; if(tt<0)n0=0;else{const gi=pm12[ii+perm[jj+perm[kk]]];tt*=tt;n0=tt*tt*(Grad[gi][0]*x0+Grad[gi][1]*y0+Grad[gi][2]*z0);}
-    tt=0.6-x1*x1-y1*y1-z1*z1; if(tt<0)n1=0;else{const gi=pm12[ii+i1+perm[jj+j1+perm[kk+k1]]];tt*=tt;n1=tt*tt*(Grad[gi][0]*x1+Grad[gi][1]*y1+Grad[gi][2]*z1);}
-    tt=0.6-x2*x2-y2*y2-z2*z2; if(tt<0)n2=0;else{const gi=pm12[ii+i2+perm[jj+j2+perm[kk+k2]]];tt*=tt;n2=tt*tt*(Grad[gi][0]*x2+Grad[gi][1]*y2+Grad[gi][2]*z2);}
-    tt=0.6-x3*x3-y3*y3-z3*z3; if(tt<0)n3=0;else{const gi=pm12[ii+1+perm[jj+1+perm[kk+1]]];tt*=tt;n3=tt*tt*(Grad[gi][0]*x3+Grad[gi][1]*y3+Grad[gi][2]*z3);}
-    return 32*(n0+n1+n2+n3); }
+  // pointer (damped) — the cursor reveals dots locally
+  let mx=innerWidth/2, my=innerHeight/2, pmx=mx, pmy=my;
+  addEventListener('pointermove', e=>{ mx=e.clientX; my=e.clientY; });
 
-  const clamp=(v,a=0,b=1)=>v<a?a:v>b?b:v, lerp=(a,b,x)=>a+(b-a)*x, smooth=(e0,e1,x)=>{x=clamp((x-e0)/(e1-e0));return x*x*(3-2*x);};
-
-  // pointer (damped, high pull throughout)
-  let mx=innerWidth/2,my=innerHeight/2,pmx=mx,pmy=my;
-  addEventListener('pointermove',e=>{ mx=e.clientX; my=e.clientY; });
-
-  // scroll progress across the whole page (window scroll): 0 at the top (hero) → 1 at the footer. Messy tangle up top → emissive ∞ at the bottom.
-  let curP=0;
-  function target(){ const max=document.documentElement.scrollHeight-innerHeight; return max>0?clamp(scrollY/max):0; }
-
-  let AMP,STRUCT,SPEED,FREQ,MOUSE,GLOW,TCLOCK=0;
-  function loopyLine(phase,alpha,emissive,width){
-    if(alpha<0.01)return;
-    const N=260, spreadX=W*(0.10+0.44*AMP), spreadY=H*(0.10+0.44*AMP);
-    const cx=W*0.5, cy=H*0.5, R=Math.min(W,H)*0.42, st=STRUCT, Rx=W*0.30, Ry=H*0.22, pts=[];
-    for(let i=0;i<=N;i++){
-      const u=i/N;
-      let wx=noise3(u*FREQ*2.4, phase+10, TCLOCK)*spreadX, wy=noise3(u*FREQ*2.4, phase+90, TCLOCK)*spreadY;
-      const ew=smooth(0,0.16, Math.min(u,1-u)*2), wm=1 - st*(1-ew); wx*=wm; wy*=wm;   // taper tips → closed ∞
-      const th=u*Math.PI*2, sx=cx+Math.sin(th)*Rx, sy=cy+Math.sin(2*th)*Ry;            // figure-eight spine
-      let x=(cx+wx)*(1-st)+(sx+wx*0.28)*st, y=(cy+wy)*(1-st)+(sy+wy*0.28)*st;
-      if(MOUSE>0){ const dx=x-pmx, dy=y-pmy, d=Math.hypot(dx,dy)||1;
-        if(d<R){ const f=1-d/R, sp=f*f*MOUSE; x+=(pmx-x)*sp*0.85; y+=(pmy-y)*sp*0.85; } }
-      pts.push(x,y);
-    }
-    ctx.beginPath();ctx.moveTo(pts[0],pts[1]);
-    for(let i=2;i<pts.length-2;i+=2){ const mxp=(pts[i]+pts[i+2])/2, myp=(pts[i+1]+pts[i+3])/2; ctx.quadraticCurveTo(pts[i],pts[i+1],mxp,myp); }
-    ctx.lineTo(pts[pts.length-2],pts[pts.length-1]); if(st>0.85)ctx.closePath();
-    const g=ctx.createLinearGradient(0,0,W,0);g.addColorStop(0,'#1e40ff');g.addColorStop(1,'#ff8a3d');
-    if(emissive&&GLOW>0.01){ctx.save();ctx.globalCompositeOperation='lighter';ctx.shadowColor='#ff8a3d';ctx.shadowBlur=GLOW*42;}
-    ctx.globalAlpha=alpha;ctx.lineWidth=width;ctx.strokeStyle=g;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();ctx.globalAlpha=1;
-    if(emissive&&GLOW>0.01)ctx.restore();
-  }
-
-  function frame(){
-    cv.style.opacity='1';                                 // v3: persistent site background — always on (the strips scrim hides it during the hero, then reveals it)
-    curP += (target()-curP)*0.10;                         // damped scroll-POSITION scalar → reversible
-    const p=curP;
-    STRUCT=smooth(0.05,0.95,p); SPEED=lerp(0.95,0.30,p); FREQ=lerp(1.75,0.95,p); AMP=lerp(1.05,0.50,p); MOUSE=1.0; GLOW=smooth(0.32,1.0,p);
-    ctx.clearRect(0,0,W,H);
-    const bgFade=1-smooth(0.18,0.62,p);
-    for(let l=1;l<6;l++) loopyLine(l*2.1, 0.15*bgFade*(1-l*0.05), false, 1.3);      // messy tangle, fades out
-    loopyLine(0, lerp(0.18,0.95,smooth(0.12,0.68,p)), true, lerp(1.8,4.8,p));       // lead line: brightens + thickens + emits
-    TCLOCK+=0.016*SPEED; pmx+=(mx-pmx)*0.08; pmy+=(my-pmy)*0.08;
+  function frame(now){
+    cv.style.opacity='1';                                 // persistent site background — always on (the strips scrim hides it during the hero, then reveals it)
+    pmx+=(mx-pmx)*0.10; pmy+=(my-pmy)*0.10;
+    const t=now*0.001;
+    ctx.fillStyle='#0a1633'; ctx.fillRect(0,0,W,H);       // navy base so the additive dots glow over it (matches the lab; #liquidBg sits at z-2 behind the site)
+    const hx=W*(0.5+0.34*Math.sin(t*0.24)), hy=H*(0.5+0.30*Math.cos(t*0.19)), hR=Math.min(W,H)*0.55;   // slow drifting warm hotspot → ambient life
+    ctx.globalCompositeOperation='lighter';               // lit dots EMIT + bloom through the blur
+    for(let y=GAP/2;y<H;y+=GAP){ for(let x=GAP/2;x<W;x+=GAP){
+      const wave=0.5+0.5*Math.sin(x*0.010+y*0.008-t*1.1);            // gentle breathing across the field
+      const md=Math.hypot(x-pmx,y-pmy), cur = md<170?(1-md/170):0;   // cursor reveal
+      const warm=Math.max(0,1-Math.hypot(x-hx,y-hy)/hR);            // drifting warm glow
+      const glow=Math.min(1, Math.max(cur, warm*0.78, wave*0.14));
+      const r=Math.round(85+glow*170), g=Math.round(100+glow*72), b=Math.round(235-glow*165); // cobalt → hot warm orange
+      ctx.fillStyle='rgba('+Math.min(255,r)+','+Math.min(255,g)+','+Math.min(255,b)+','+Math.min(1,0.08+glow*1.05).toFixed(3)+')';
+      ctx.beginPath(); ctx.arc(x,y,1.3+glow*3.1,0,TAU); ctx.fill();
+    } }
+    ctx.globalCompositeOperation='source-over';
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-})();}catch(e){ console.warn('squiggle bg off:',e); }
+})();}catch(e){ console.warn('scan-field bg off:',e); }
 </script>
 </body>
 </html>

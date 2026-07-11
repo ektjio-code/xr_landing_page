@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XRZENO · background lab</title>
+<style>
+  :root{ --nav:#0a1633; --cobalt:#1e40ff; --warm:#ff8a3d; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:var(--nav); overflow:hidden;
+    font-family:'Montserrat',system-ui,Segoe UI,sans-serif; color:#dfe6ff; }
+  #bg{ position:fixed; inset:0; display:block; }
+  #bg.soft{ filter:blur(5px); }   /* the "blurry plane" treatment, like the live #liquidBg squiggle */
+  /* sample content to judge "unobtrusive" */
+  #sample{ position:fixed; inset:0; display:none; pointer-events:none;
+    flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  #sample.on{ display:flex; }
+  #sample h1{ font-size:clamp(48px,11vw,150px); font-weight:800; letter-spacing:.06em; margin:0;
+    color:#eef2ff; text-shadow:0 2px 30px rgba(0,0,0,.55); }
+  #sample p{ max-width:44ch; font-size:15px; line-height:1.7; color:#b9c6f0; text-shadow:0 2px 18px rgba(0,0,0,.6); }
+  /* toolbar */
+  #bar{ position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:10;
+    display:flex; gap:6px; flex-wrap:wrap; justify-content:center; padding:7px;
+    background:rgba(10,18,42,.6); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(120,150,255,.22); border-radius:12px; max-width:94vw; }
+  .btn{ font:600 12px/1 inherit; letter-spacing:.02em; color:#c7d3f5; cursor:pointer;
+    padding:9px 13px; border:1px solid transparent; border-radius:8px; background:transparent;
+    transition:background .18s,color .18s,border-color .18s; }
+  .btn:hover{ background:rgba(120,150,255,.12); }
+  .btn.active{ background:var(--cobalt); color:#fff; border-color:rgba(255,255,255,.25); }
+  .btn.util{ color:#9fb0e0; }
+  .btn.util.on{ background:rgba(255,138,61,.18); color:var(--warm); border-color:rgba(255,138,61,.4); }
+  #cap{ position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:10;
+    max-width:min(760px,92vw); text-align:center; font-size:12.5px; line-height:1.6; color:#aab8e6;
+    background:rgba(10,18,42,.55); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(120,150,255,.18); border-radius:10px; padding:9px 14px; pointer-events:none; }
+  #cap b{ color:#dfe6ff; } #cap .k{ color:var(--warm); }
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div id="sample"><h1>XRZENO</h1><p>Show your product, not a picture of it. A quiet, interactive backdrop should feel intentional, never busy — the object stays the hero.</p></div>
+<div id="bar">
+  <button class="btn" data-mode="mesh">Living mesh</button>
+  <button class="btn" data-mode="grid">AR ground grid</button>
+  <button class="btn" data-mode="sweep">Scan sweep</button>
+  <button class="btn" data-mode="scanfield">Scan field · soft</button>
+  <button class="btn" data-mode="param">Parametric curve</button>
+  <button class="btn" data-mode="aurora">Gradient aurora</button>
+  <button class="btn" data-mode="caustic">Caustic shimmer</button>
+  <button class="btn util" id="sampleToggle">Sample text</button>
+</div>
+<div id="cap"></div>
+
+<script>
+const TAU = Math.PI*2;
+const cvs = document.getElementById('bg'), ctx = cvs.getContext('2d');
+let cw=innerWidth, ch=innerHeight, dpr=Math.min(devicePixelRatio||1, 2);
+function resize(){ cw=innerWidth; ch=innerHeight; dpr=Math.min(devicePixelRatio||1,2);
+  cvs.width=Math.round(cw*dpr); cvs.height=Math.round(ch*dpr); cvs.style.width=cw+'px'; cvs.style.height=ch+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0); if(active&&active.init) active.init(); }
+// mouse (smoothed)
+let mx=cw/2, my=ch/2, smx=mx, smy=my;
+addEventListener('mousemove', e=>{ mx=e.clientX; my=e.clientY; });
+const ease = t=> t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+const lerp = (a,b,t)=> a+(b-a)*t;
+
+/* ---------- 1) LIVING MESH ---------- */
+const mesh = (()=>{ let pts=[];
+  function init(){ pts=[]; const n=Math.min(170, Math.round(cw*ch/15000));
+    for(let i=0;i<n;i++) pts.push({x:Math.random()*cw,y:Math.random()*ch,vx:(Math.random()-.5)*14,vy:(Math.random()-.5)*14}); }
+  function draw(now,dt){ ctx.fillStyle='#0a1633'; ctx.fillRect(0,0,cw,ch);
+    const maxD=145;
+    for(const p of pts){ p.x+=p.vx*dt; p.y+=p.vy*dt;
+      if(p.x<0){p.x=0;p.vx*=-1;} if(p.x>cw){p.x=cw;p.vx*=-1;} if(p.y<0){p.y=0;p.vy*=-1;} if(p.y>ch){p.y=ch;p.vy*=-1;}
+      const dx=p.x-smx, dy=p.y-smy, d=Math.hypot(dx,dy)||1; if(d<170){ const f=(170-d)/170*55*dt; p.x+=dx/d*f; p.y+=dy/d*f; } }
+    for(let i=0;i<pts.length;i++){ const a=pts[i];
+      for(let j=i+1;j<pts.length;j++){ const b=pts[j]; const dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy);
+        if(d<maxD){ ctx.strokeStyle='rgba(110,141,255,'+(0.22*(1-d/maxD)).toFixed(3)+')'; ctx.lineWidth=1;
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } } }
+    ctx.fillStyle='rgba(150,175,255,0.55)';
+    for(const p of pts){ ctx.beginPath(); ctx.arc(p.x,p.y,1.5,0,TAU); ctx.fill(); }
+  }
+  return {init,draw,cap:'<b>Living mesh</b> — points drift and re-triangulate; your cursor pushes the nearest nodes aside. Reads as 3D reconstruction / a wireframe forming.'};
+})();
+
+/* ---------- 2) AR GROUND GRID ---------- */
+const grid = (()=>{ let phase=0;
+  function draw(now,dt){ ctx.fillStyle='#0a1633'; ctx.fillRect(0,0,cw,ch);
+    const vpx=cw/2+(smx-cw/2)*0.18, horizon=ch*0.40+(smy-ch/2)*0.05;
+    phase=(phase+dt*0.12)%1; ctx.lineWidth=1;
+    const rows=20;
+    for(let i=0;i<rows;i++){ const f=(i+phase)/rows; const z=1-f; const y=horizon+(ch-horizon)*(z*z);
+      const a=0.30*f+0.02; ctx.strokeStyle='rgba(95,125,255,'+a.toFixed(3)+')';
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(cw,y); ctx.stroke(); }
+    const cols=26;
+    for(let i=0;i<=cols;i++){ const bx=(i/cols)*cw*2-cw*0.5;
+      ctx.strokeStyle='rgba(95,125,255,0.10)'; ctx.beginPath(); ctx.moveTo(bx,ch); ctx.lineTo(vpx,horizon); ctx.stroke(); }
+    const R=150, g=ctx.createRadialGradient(smx,smy,0,smx,smy,R);
+    g.addColorStop(0,'rgba(255,138,61,0.13)'); g.addColorStop(1,'rgba(255,138,61,0)');
+    ctx.fillStyle=g; ctx.fillRect(smx-R,smy-R,R*2,R*2);
+  }
+  return {draw,cap:'<b>AR ground grid</b> — a receding surface plane; the vanishing point tilts toward your cursor and a warm bloom reads as <span class="k">"surface detected."</span>'};
+})();
+
+/* ---------- 3) SCAN SWEEP ---------- */
+const sweep = (()=>{ let sx=-80; const gap=44;
+  function draw(now,dt){ ctx.fillStyle='#0a1633'; ctx.fillRect(0,0,cw,ch);
+    sx+=dt*300; if(sx>cw+80) sx=-80; const band=100;
+    for(let y=gap/2;y<ch;y+=gap){ for(let x=gap/2;x<cw;x+=gap){
+      const d=Math.abs(x-sx); let b= d<band ? (1-d/band) : 0;
+      const md=Math.hypot(x-smx,y-smy); if(md<120) b=Math.max(b,(1-md/120)*0.85);
+      const base=0.05, a=base+b*0.85;
+      ctx.fillStyle = b>0.01 ? 'rgba('+Math.round(120+b*70)+','+Math.round(150+b*50)+',255,'+a.toFixed(3)+')'
+                             : 'rgba(90,110,200,'+base+')';
+      ctx.beginPath(); ctx.arc(x,y,1.2+b*2.0,0,TAU); ctx.fill(); } }
+    const g=ctx.createLinearGradient(sx-34,0,sx+34,0);
+    g.addColorStop(0,'rgba(110,141,255,0)'); g.addColorStop(.5,'rgba(160,185,255,0.45)'); g.addColorStop(1,'rgba(110,141,255,0)');
+    ctx.fillStyle=g; ctx.fillRect(sx-34,0,68,ch);
+  }
+  return {draw,cap:'<b>Scan sweep</b> — a light bar reveals a hidden dot-grid only as it passes (LiDAR / structured-light vibe). Your cursor scans locally. Silent between passes.'};
+})();
+
+/* ---------- 3b) SCAN FIELD · soft (no bar, blurred plane, cobalt→warm emissive) ---------- */
+const scanfield = (()=>{ const gap=46;
+  function draw(now,dt){ ctx.fillStyle='#0a1633'; ctx.fillRect(0,0,cw,ch);
+    const t=now*0.001;
+    // slow drifting warm hotspot replaces the sweep bar → keeps it alive, ambient
+    const hx=cw*(0.5+0.34*Math.sin(t*0.24)), hy=ch*(0.5+0.30*Math.cos(t*0.19)), hR=Math.min(cw,ch)*0.55;
+    ctx.globalCompositeOperation='lighter';   // dots EMIT — bright ones add up + bloom through the blur
+    for(let y=gap/2;y<ch;y+=gap){ for(let x=gap/2;x<cw;x+=gap){
+      const wave=0.5+0.5*Math.sin(x*0.010+y*0.008-t*1.1);            // gentle breathing across the field
+      const md=Math.hypot(x-smx,y-smy), cur = md<170?(1-md/170):0;   // cursor reveal
+      const warm=Math.max(0,1-Math.hypot(x-hx,y-hy)/hR);            // drifting warm glow
+      const glow=Math.min(1, Math.max(cur, warm*0.78, wave*0.14));
+      const r=Math.round(85+glow*170), g=Math.round(100+glow*72), b=Math.round(235-glow*165); // cobalt → hot warm orange (kept warm, not white)
+      ctx.fillStyle='rgba('+Math.min(255,r)+','+Math.min(255,g)+','+Math.min(255,b)+','+Math.min(1,0.08+glow*1.05).toFixed(3)+')';
+      ctx.beginPath(); ctx.arc(x,y,1.3+glow*3.1,0,TAU); ctx.fill();
+    } }
+    ctx.globalCompositeOperation='source-over';
+  }
+  return {draw,cap:'<b>Scan field · soft</b> — the dot-grid with the bar removed, dropped under a blurred plane (like the live squiggle) and lit cobalt → <span class="k">warm emissive</span>. A slow warm hotspot drifts for ambient life; your cursor reveals locally. Light on budget.'};
+})();
+
+/* ---------- 4) PARAMETRIC CURVE ---------- */
+const param = (()=>{ const N=260;
+  const shapes=[
+    {name:'Circle',        fn:t=>{const a=t*TAU; return [Math.cos(a),Math.sin(a)];}},
+    {name:'Lemniscate (∞)',fn:t=>{const a=t*TAU,s=Math.sin(a),c=Math.cos(a),d=1+s*s; return [1.5*c/d, 1.5*s*c/d];}},
+    {name:'Lissajous',     fn:t=>{const a=t*TAU; return [Math.sin(3*a+Math.PI/2),Math.sin(2*a)];}},
+    {name:'Rose (k=5)',    fn:t=>{const a=t*TAU,r=Math.cos(5*a); return [r*Math.cos(a),r*Math.sin(a)];}},
+    {name:'Superformula',  fn:t=>{const th=t*TAU,m=7,n1=.30,n2=.30,n3=.30;
+        const r=Math.pow(Math.pow(Math.abs(Math.cos(m*th/4)),n2)+Math.pow(Math.abs(Math.sin(m*th/4)),n3),-1/n1);
+        const R=Math.min(1.15,r); return [R*Math.cos(th),R*Math.sin(th)];}},
+  ];
+  let idx=0, cur=[], from=[], to=[], morph=1, lastSwitch=0;
+  const samp=fn=>{const p=[]; for(let i=0;i<N;i++) p.push(fn(i/N)); return p;};
+  function setShape(i){ idx=i; from=cur.length?cur.map(p=>p.slice()):samp(shapes[i].fn); to=samp(shapes[i].fn); morph=0; updateCap(); }
+  function init(){ idx=0; cur=samp(shapes[0].fn); from=cur.map(p=>p.slice()); to=cur.map(p=>p.slice()); morph=1; lastSwitch=performance.now(); updateCap(); }
+  function next(){ setShape((idx+1)%shapes.length); lastSwitch=performance.now(); }
+  function draw(now,dt){ ctx.fillStyle='#0a1633'; ctx.fillRect(0,0,cw,ch);
+    if(now-lastSwitch>4200) next();
+    morph=Math.min(1,morph+dt*0.85); const e=ease(morph);
+    for(let i=0;i<N;i++){ cur[i][0]=from[i][0]+(to[i][0]-from[i][0])*e; cur[i][1]=from[i][1]+(to[i][1]-from[i][1])*e; }
+    const s=Math.min(cw,ch)*0.30, rot=(smx-cw/2)/cw*0.7+(smy-ch/2)/ch*0.15;
+    ctx.save(); ctx.translate(cw/2,ch/2); ctx.rotate(rot);
+    ctx.beginPath(); for(let i=0;i<=N;i++){ const p=cur[i%N]; i?ctx.lineTo(p[0]*s,p[1]*s):ctx.moveTo(p[0]*s,p[1]*s); }
+    ctx.closePath(); ctx.strokeStyle='rgba(125,155,255,0.62)'; ctx.lineWidth=1.6;
+    ctx.shadowBlur=16; ctx.shadowColor='rgba(60,90,255,0.7)'; ctx.stroke(); ctx.shadowBlur=0;
+    const hp=cur[Math.floor((now*0.05)%N)]; ctx.fillStyle='rgba(255,138,61,0.95)';
+    ctx.beginPath(); ctx.arc(hp[0]*s,hp[1]*s,3,0,TAU); ctx.fill(); ctx.restore();
+  }
+  function updateCap(){ if(active===param) document.getElementById('cap').innerHTML=param.cap(); }
+  const cap=()=> '<b>Parametric curve → '+shapes[idx].name+'</b> — one rule-driven line that MORPHS between exact shapes (auto-cycles · <span class="k">click to advance</span> · cursor rotates). Any CLOSED outline is possible via Fourier epicycles — even a product silhouette or the wordmark.';
+  return {init,draw,next,cap};
+})();
+
+/* ---------- 5) GRADIENT AURORA ---------- */
+const aurora = (()=>{
+  const defs=[['30,70,255',0.0,1.0,0.8],['255,138,61',1.7,0.7,1.2],['90,160,255',3.1,1.2,0.9],['120,60,220',4.4,0.85,1.05]];
+  function draw(now,dt){ ctx.fillStyle='#0a1633'; ctx.fillRect(0,0,cw,ch);
+    ctx.globalCompositeOperation='lighter'; const t=now*0.00018;
+    for(let k=0;k<defs.length;k++){ const d=defs[k];
+      let bx=cw*(0.5+0.34*Math.sin(t*d[2]+d[1])), by=ch*(0.5+0.30*Math.cos(t*d[3]*1.3+d[1]*1.4));
+      if(k===1){ bx+=(smx-bx)*0.45; by+=(smy-by)*0.45; }
+      const R=Math.min(cw,ch)*0.60, g=ctx.createRadialGradient(bx,by,0,bx,by,R);
+      g.addColorStop(0,'rgba('+d[0]+',0.34)'); g.addColorStop(1,'rgba('+d[0]+',0)');
+      ctx.fillStyle=g; ctx.fillRect(bx-R,by-R,R*2,R*2); }
+    ctx.globalCompositeOperation='source-over';
+  }
+  return {draw,cap:'<b>Gradient aurora</b> — slow cobalt/warm light drifting; the warm bloom follows your cursor. The most invisible option — pure atmosphere, no structure.'};
+})();
+
+/* ---------- 6) CAUSTIC / GLASS SHIMMER ---------- */
+const caustic = (()=>{ let oc,octx,img,ow,oh;
+  function init(){ ow=220; oh=Math.max(1,Math.round(ow*ch/cw)); oc=document.createElement('canvas');
+    oc.width=ow; oc.height=oh; octx=oc.getContext('2d'); img=octx.createImageData(ow,oh); }
+  function draw(now,dt){ const t=now*0.001, d=img.data, lx=smx/cw, ly=smy/ch;
+    for(let y=0;y<oh;y++){ for(let x=0;x<ow;x++){ const u=x/ow, v=y/oh;
+      const a=u*6.0, b=v*6.0; const wx=a+Math.sin(b*1.3+t*1.1)*0.8, wy=b+Math.sin(a*1.7-t*0.9)*0.8;
+      const val=Math.sin(wx+t)+Math.sin(wy-t*1.2)+Math.sin((wx+wy)*0.7+t*0.5);
+      let c=Math.pow(1-Math.min(1,Math.abs(val)/3),3);
+      c*=Math.max(0.2, 1-0.6*Math.hypot(u-lx,v-ly));
+      const i=(y*ow+x)*4; d[i]=20+c*185; d[i+1]=30+c*150; d[i+2]=60+c*195; d[i+3]=255; } }
+    octx.putImageData(img,0,0);
+    ctx.fillStyle='#0a1633'; ctx.fillRect(0,0,cw,ch);
+    ctx.filter='blur(4px)'; ctx.drawImage(oc,0,0,cw,ch); ctx.filter='none';
+  }
+  return {init,draw,cap:'<b>Caustic shimmer</b> — refracted glass light; your cursor moves the light source. A nod to the glass bottle. Warm ridges over cobalt.'};
+})();
+
+/* ---------- harness ---------- */
+const modes={mesh,grid,sweep,scanfield,param,aurora,caustic};
+let active=null, activeName='';
+function setMode(name){ activeName=name; active=modes[name];
+  document.querySelectorAll('.btn[data-mode]').forEach(b=>b.classList.toggle('active', b.dataset.mode===name));
+  cvs.classList.toggle('soft', name==='scanfield');   // blurry-plane treatment only for the soft scan field
+  if(active.init) active.init();
+  document.getElementById('cap').innerHTML = typeof active.cap==='function'? active.cap() : active.cap;
+}
+document.querySelectorAll('.btn[data-mode]').forEach(b=> b.addEventListener('click', ()=>setMode(b.dataset.mode)));
+document.getElementById('sampleToggle').addEventListener('click', e=>{
+  document.getElementById('sample').classList.toggle('on'); e.currentTarget.classList.toggle('on'); });
+cvs.addEventListener('click', ()=>{ if(activeName==='param') param.next(); });
+addEventListener('resize', resize);
+
+let last=performance.now();
+function loop(now){ let dt=(now-last)/1000; last=now; dt=dt>0?Math.min(dt,1/30):1/60;
+  smx+=(mx-smx)*0.12; smy+=(my-smy)*0.12;
+  if(active) active.draw(now,dt); requestAnimationFrame(loop); }
+resize(); setMode('mesh'); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
