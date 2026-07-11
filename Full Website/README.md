@@ -47,10 +47,13 @@ each session.
 
 ## Current state
 
-### Desktop v3 — the new front door (`index_v3.html`, ACTIVE, updated 2026-07-10 EOD)
+### Desktop v3 — the new front door (`index_v3.html`, ACTIVE, updated 2026-07-11)
 Built off a copy of v2. The tokonoma/shinobu cinematic is DROPPED from the initial view (scene still loads +
 compiles up front — feeds the load bar) and is now **re-homed as the "How it works" section** (see below).
-Flow, all **native scroll**:
+**2026-07-11 session added:** scan-field background (replaced the squiggle) · Method-A exit wipe + FAQ
+reveal-in-place · emissive card frames + drop shadows · **autoplay-scroll on How-it-works**. Labs at repo
+root: `bg-lab.html`, `frame-lab.html`, `autoplay-lab.html`.
+Flow (native scroll everywhere EXCEPT How-it-works, which CAPTURES the wheel to auto-play — see its section):
 1. **White loading hero** — big black `XRZENO` decodes L→R (matrix) and DOUBLES as the real load bar
    (EXR+GLB byte progress → 0–90%, shader compile fills the last 10%, min 1.5s; cobalt cursor on the active
    letter). White-on-black by design → high contrast for the reveal (INVERTS + kills the dark-on-dark the
@@ -59,10 +62,10 @@ Flow, all **native scroll**:
    the white hero is eaten strip-by-strip THROUGH the wordmark to print the body up. `STRIP_PX 34`,
    `STRIP_WIPE 0.18`, SOD f2/ζ1/r0. Static-hash → scrub-reversible. `#release` runway removed so Real vs
    Render sits right behind the scrim and prints up THROUGH the wipe.
-3. **Squiggle background** on `#liquidBg` — a noise→infinity loopy line (cobalt→warm `#1e40ff→#ff8a3d`,
-   HIGH mouse-pull, `blur(5px)`, **DPR-1**), scroll-driven top (messy tangle) → footer (steady emissive,
-   CLOSED ∞). Replaces the old metaball field. Figure-eight spine blended by structure; tip-taper +
-   closePath seals the ∞. Prototypes: `squiggle-scroll.html` (recipe) / `squiggle-demo.html` (sandbox).
+3. **Scan-field background** on `#liquidBg` (2026-07-11, REPLACED the noise→∞ squiggle) — a soft dot-grid under
+   the same blurred plane (`blur(5px)`, **DPR-1**, always-on). A slow warm hotspot drifts for ambient life,
+   the cursor reveals dots locally, lit dots EMIT (additive `lighter`) cobalt→warm `#ff8a3d`. Light (~1–2ms/
+   frame, no per-pixel work — cheaper than the simplex squiggle). Sandbox: `bg-lab.html` (6 bg directions).
 4. DOM **body** (cold Monture palette) + glass **drawer** — as v2, but now normal in-flow DOM.
 5. **"How it works" scene** (`#process`, see the dedicated section below) — the tokonoma cinematic plays here.
 - **The scroll-lock is GONE in v3** (Ed's call). No `enterBodyLock`/`exitBodyLock`, no window wheel listener,
@@ -70,11 +73,20 @@ Flow, all **native scroll**:
   (`sceneActive` via IntersectionObserver — replaced the old `v3Idle`), and self-pauses otherwise.
 - ⚠️ **Mobile NOT ported** — v3 is desktop-only so far.
 
-### "How it works" scene (`index_v3.html` `#process`, built 2026-07-10 EOD) — the tokonoma re-homed
+### "How it works" scene (`index_v3.html` `#process`, updated 2026-07-11) — the tokonoma re-homed
 The shinobu tokonoma cinematic (from v2) now lives in the **`#process` section** as a Lusion-astronaut-style
 embedded scene. `#process` is a tall **440vh runway**; `scrollProgress()` reads its rect, and the whole
 sequence is a pure function of that scroll scalar `sp` (reversible). Fixed fullscreen `#gl` (z-4) with the
-DOM scrolling behind it. Beats:
+DOM scrolling behind it.
+**AUTOPLAY-SCROLL (2026-07-11, Lusion astronaut model — the last block before `</body>`):** while `#process`
+is on-screen a CAPTURED `wheel` listener drives an autoplay — scroll DIRECTION sets forward/rewind, an
+autoplay clock drifts that way, and we `scrollTo` a damped target (Lenis-style), so `sp` (and the whole
+sequence below) is autoplay-driven, not raw scroll. Scroll up rewinds; stop = keeps drifting; releases at the
+top/bottom edges to native scroll (→ Portfolio / → Contact). It drives the SCROLL POSITION (not the scene
+directly) so every beat + the exit + the FAQ are UNTOUCHED — they just follow scroll. Listener attaches only
+while `#process` is on-screen (limits the compositor fast-path hit); `scroll-behavior` forced to `auto` during
+capture (html is `scroll-behavior:smooth`). Values LOCKED `SPEED 0.030 / GAIN 0.0001 / DAMP 0.30`, desktop
+only. Sandbox: `autoplay-lab.html`. NOTE: it auto-plays the FULL range incl. the exit+FAQ (Ed approved). Beats:
 1. **Embedded window → fullscreen.** The scene sits in a rounded card (`#sceneWindow`) inside a **sticky
    stage** (`#sceneStage`, pins the card at viewport centre). `#gl` is clip-path'd to the card's live rect.
    When scroll reaches the card, it **auto-opens to fullscreen on a TIME tween** (`winExpand`, ~0.7s ease) —
@@ -83,7 +95,8 @@ DOM scrolling behind it. Beats:
    **dim + warm** (low opacity so the additive stack doesn't clip to white → amber), gently **pulsing**
    (light/scale/bloom breathe — never a frozen frame), **no spin**. `camera.setViewOffset()` parks the sun
    at the *card's* screen position (both axes) so it's framed dead-centre IN the card, not a peephole crop.
-   Fades in as the card settles toward centre (kills a "black card then POP" on entry).
+   (2026-07-11: the settle-to-centre opacity fade was REMOVED — `#gl` is fully opaque the whole time it's
+   on-screen; only the exit fades it. The old fade made the windowed card scroll in faint.)
 3. **Play.** Opening spins up + scatters, then materialize (`sp .15–.40`) → journey rail (`.40–.67`), same
    RAIL/beats as v2. **Finale DROPPED** (no XRZENO wordmark, no cold/blue relight — warm throughout,
    `xrReveal=0` forced). Beats fixed: SCAN's decode plateau widened so it actually *lands* (was skipped
@@ -92,11 +105,30 @@ DOM scrolling behind it. Beats:
    iOS frosted-glass pill, bottom-centre, shown once fullscreen+formed. Toggles `#gl` `pointer-events` on
    enter (else the always-`none` canvas can't receive the orbit drag) — safe, inspect freezes the page.
    Inspect hard-holds fullscreen (`winExpand=1`); `sp` is forced 0 during inspect so guard against collapse.
-5. **Exit wipe (Pass 2).** At `sp .67–1.0` (the long exit runway, ~a full viewport of scroll), soft **bars
-   RISE UP** the scene and the next section (`#processResume` "Typical turnaround…", then the site) scrolls
-   up normally behind. STRIP ONLY — no white curtain, no scene-fade, no pinning. Implemented as a **CSS mask**
-   on `#gl` (per-column `linear-gradient` layers, soft feathered front, own hash seed `17.31` ≠ the top's).
-   Knobs: `EX_START 0.67`, `EX_STRIP 24px`, `EX_WIPE 0.16`, `EX_FEATHER 3.0`.
+5. **Exit wipe (Pass 2) — Method A (2026-07-11, REPLACED the CSS mask).** At `sp .67–1.0` a 2nd WebGL2 strips
+   scrim (`#bleed2`, z-5 above `#gl`) SAMPLES the live scene each frame (drawn right after `composer.render`,
+   via `window.__exitWipe.frame`) and eats it strip-by-strip — same shader family as the load Print Pass
+   (ink-edge + SOD glide), own seed `17.31`. `#gl` fades to 0 during the exit so eaten columns reveal the
+   site. Sidesteps the `alpha:true` load-hang landmine (separate canvas). Shader knobs: `EX_STRIP_PX 34 /
+   EX_WIPE 0.18 / EX_FEATHER 0.012 / EX_TINT 0.22`. ⚠️ Show-toggle MUST be `display:'block'`, not `''` (`''`
+   reverts to the CSS `#bleed2{display:none}` and the scrim never composites — cost a debug session).
+   **FAQ reveal-in-place (REPLACED `#processResume`).** The "Typical turnaround…" note is DELETED. The FAQ is
+   wrapped in `#faqReveal`, which overlaps the scene's last screen (`--faq-overlap 240vh`) and PINS the FAQ
+   (sticky, `top:0`) BEHIND the fullscreen scene, so the rising bars uncover it in place (no scroll-slide),
+   then it releases into normal scroll (→ Contact). Knobs: `--faq-overlap / --faq-pin` (CSS `:root`). MATH:
+   overlap must be big enough that the FAQ is pinned BEFORE the bars start (`sp .67`) — 100vh was too small.
+
+### Card frames — emissive hover-lit borders + shadows (`index_v3.html`, 2026-07-11)
+Portfolio cards, the compare photo (`.cmp`), and the windowed scene card get an EMISSIVE glowing border drawn
+on `#fx` (canvas, z-5 above `#gl`): a stroked ROUNDED-RECT path whose points MAGNETIZE toward the cursor
+(`R 185 / MAXPULL 54`); hovering ignites the whole border cobalt, and the cursor spot heats to warm-white.
+REAL bloom (points → offscreen buffer → composited back at growing blur radii, additive → hot cores bleed).
+Idle-cheap (only draws when something's lit; off-screen cards skipped). The scene card's rect is fed live via
+`window.__sceneFrame` (set by the scene loop; lit by windowed-ness `1-expand`, off during inspect + exit).
+Drove `--mx/--my`? no — that was the earlier SPECULAR SHEEN attempt, which this REPLACED (removed). Drop
+shadows on `.card` / `.card.featured .fwrap` / `.cmp` so nothing sits flat. Sandbox: `frame-lab.html` (6
+frame directions: reticle · tilt · sweep · bevel · sheen · emissive). Featured card keeps its depth focus-pull
+INSIDE the glowing frame. Cards 2 & 3 are still `<model-viewer>` placeholders (pending real GLB/USDZ).
 
 ### v2 + mobile (prior, still valid — scroll-lock still LIVES here)
 - `index_v2.html` (three r0.169): hero cinematic (materialize → journey rail → clay→final PBR → pinned
@@ -109,32 +141,44 @@ DOM scrolling behind it. Beats:
   drawer ported 1:1. Beats/finale during materialize were SCRATCHED (small screen, too busy).
 
 ## NEXT
-- ✅ Done 2026-07-10: squiggle bg, white loading hero, **Print Pass strips-wipe**, scroll-lock removed. The
-  old "hero scroll rework via Lusion astronaut" is **moot** — v3 replaced that whole hero.
-- ✅ Done 2026-07-10 EOD: **"How it works" 3D scene** — tokonoma re-homed into `#process` (embedded window →
-  auto-open → pulsing sun → play → View-in-3D pill → soft strips exit wipe). See the dedicated section above.
+- ✅ Done 2026-07-10: squiggle bg, white loading hero, **Print Pass strips-wipe**, scroll-lock removed; the
+  **"How it works" 3D scene** (tokonoma re-homed into `#process`).
+- ✅ Done 2026-07-11: **scan-field bg** (replaced squiggle) · **Method-A exit wipe** + **FAQ reveal-in-place**
+  (replaced the CSS-mask exit + `#processResume`) · **emissive card frames + shadows** (replaced a sheen
+  attempt) · scene card always-opaque · DELIVER load-flash fixed · **autoplay-scroll on How-it-works**.
 1. **Port v3 to MOBILE** (`index.html` still on the old tap model). Apply the "does this port cheaply?" check.
-   The whole How-it-works scene is desktop-only so far.
+   The whole How-it-works scene + autoplay-scroll + emissive frames are desktop-only so far.
 2. **Real assets (Ed inputs):** portfolio GLB/USDZ for cards 2 & 3 (card 1 = bottle); the real photo+render
    pair for the compare slider (SAME angle/framing or the trick dies — currently placeholder gradients);
    real social handles for the 5 drawer icons (`instagram.com/xrzeno` etc. are placeholders).
 3. **Copy dash-sweep at finalization** — strip AI-dash tells from `strings.js` (EN+ID) + body copy.
-- **How-it-works polish open (all Ed-eyeball tuning):** exit-strip pace/width/feather feel; whether the
-  CSS-mask exit is smooth enough (many per-column layers/frame — widen columns or throttle if janky);
-  the sun size/pulse; the resume ("Typical turnaround…") reveal position/timing during the wipe; whether
-  to add the soft ink-EDGE the top wipe has (would need the render-pipeline alpha approach — see gotcha).
-- **v3 polish open:** intro→scrim wordmark alignment at the handoff; strip/wipe/edge-tint feel.
+- **Parked (Ed, revisit):** the scene-card opacity "still out of place" per Ed — he made it opaque but wasn't
+  100% happy; nail down exactly what's off when he flags it. Also floated but not built: warping the *photo*
+  inside a frame WITH the magnet (SVG `feDisplacementMap` for flat photos / vertex warp on the WebGL focus-pull
+  card) — Ed said "forget it" for now.
+- **v3 polish open (Ed-eyeball):** autoplay feel across trackpad vs wheel; whether the autoplay should cap at
+  the journey end instead of auto-running the exit+FAQ; emissive frame brightness/magnet on the real cards;
+  compare/scene emissive glow (Ed: "not there yet" earlier, then the frames landed — recheck); intro→scrim
+  wordmark alignment.
 
 ## Load-bearing gotchas
 - **Reversibility rule (whole site):** drive camera/timeline/reveal from a scroll-**POSITION** scalar, read
   fresh each frame, set state DIRECTLY. NEVER a per-frame `.lerp` follow or integrated velocity (lags
   asymmetrically → breaks reverse-scroll). This is why the wheel-driven auto-scroll was reverted, and why
   the rail reads a damped scalar (`curJ += (journeyP-curJ)*0.1`) then sets the pose directly.
-- **Scroll-lock is v2/mobile ONLY — v3 REMOVED it.** Don't port it into v3. (v2/mobile: `RAMP =
+- **Scroll-lock:** the OLD v2/mobile canvas-release scroll-lock is v2/mobile ONLY — don't port THAT into v3.
+  BUT v3 now has a NEW, scoped scroll-capture for How-it-works only (see below). (v2/mobile: `RAMP =
   innerHeight*0.9` must match the `bodyP` denominator AND `#release`.)
-- **v3 scroll traps (cost real time):** a non-passive `wheel` listener on `window` disables Chrome's fast
-  compositor scroll page-wide (stalls until a mouse-move flushes it); OrbitControls on a `pointer-events`
-  canvas eats the wheel. Keep idle/hidden canvases `pointer-events:none`; no window wheel handlers.
+- **How-it-works autoplay-scroll (2026-07-11):** the LAST script before `</body>` adds a non-passive `wheel`
+  listener that CAPTURES the wheel and drives `window.scrollTo` while `#process` is on-screen (autoplay). This
+  intentionally reverses the old "no window wheel handlers" rule — but scoped: the listener is attached only
+  while `#process` intersects, and removed otherwise, to limit the compositor fast-path hit. It forces
+  `html.style.scrollBehavior='auto'` during capture (html is `scroll-behavior:smooth`, which would double-smooth
+  the per-frame drive). It drives the SCROLL POSITION, so the scene/exit/FAQ are unaffected. Only `wheel` is
+  captured (keyboard/scrollbar fall through to native). Locked values `SPEED .030 / GAIN .0001 / DAMP .30`.
+- **v3 scroll traps (cost real time):** OrbitControls on a `pointer-events` canvas eats the wheel — keep
+  idle/hidden canvases `pointer-events:none`. (The general "no window wheel handlers" rule now has the one
+  scoped exception above.)
 - **Reveal-on-scroll:** viewport IntersectionObserver root (not `#siteBody`). v3: observers attach
   immediately (body always on-screen) + **hysteresis** (show ≥12%, hide only when fully out) or the reveal
   `translateY` re-trips a single threshold → edge jitter.
