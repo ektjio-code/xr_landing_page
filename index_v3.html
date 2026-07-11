@@ -84,7 +84,7 @@
   .eyebrow{font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.34em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
   h2{font-family:var(--disp);font-weight:800;font-size:clamp(1.9rem,4.4vw,3.2rem);letter-spacing:.01em;line-height:1.08;margin-bottom:20px}
   .lede{color:var(--muted);max-width:56ch;margin-bottom:44px}
-  .cmp{position:relative;max-width:860px;margin:0 auto;aspect-ratio:16/10;overflow:hidden;border:1px solid var(--hairline);background:var(--bg-deep);border-radius:12px}
+  .cmp{position:relative;max-width:860px;margin:0 auto;aspect-ratio:16/10;overflow:hidden;border:1px solid var(--hairline);background:var(--bg-deep);border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.46),0 4px 12px rgba(0,0,0,.32)}
   .cmp .layer{position:absolute;inset:0;background-size:cover;background-position:center}
   .ph-real{background-image:linear-gradient(115deg,#3a2c1d,#6b5238 55%,#281d13)}
   .ph-render{background-image:linear-gradient(115deg,#101f3d,#2a3c60 55%,#0e1729)}
@@ -95,26 +95,12 @@
   .cmp .tag{position:absolute;bottom:14px;font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink);background:rgba(14,12,10,.6);padding:5px 12px;pointer-events:none}
   .cmp .tag.l{left:14px} .cmp .tag.r{right:14px}
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
-  .card{position:relative;background:var(--bg-deep);border:1px solid var(--hairline);padding:14px 14px 18px;border-radius:14px}
-  /* SPECULAR SHEEN — a bright highlight rakes the frame edge, following the cursor (cobalt→warm), on hover. On the plain cards it rings the card; on the featured card it rings the .fwrap image (pairs with the depth focus-pull). Driven by --mx/--my (see the sheen script). */
-  .card:not(.featured)::after, .card.featured .fwrap::after, .cmp::after{
-    content:"";position:absolute;inset:0;border-radius:inherit;padding:3.5px;opacity:0;transition:opacity .25s;pointer-events:none;
-    background:radial-gradient(300px circle at var(--mx,50%) var(--my,50%), rgba(230,238,255,1) 0%, rgba(150,180,255,.98) 15%, rgba(255,138,61,.92) 36%, transparent 64%);
-    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);-webkit-mask-composite:xor;
-    mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);mask-composite:exclude;
-    filter:drop-shadow(0 0 8px rgba(160,190,255,.6)) drop-shadow(0 0 14px rgba(255,138,61,.35));}
-  .card:not(.featured):hover::after, .card.featured .fwrap:hover::after, .cmp:hover::after{opacity:1}
-  /* Scene card sheen — the scene canvas (#gl) sits ABOVE #sceneWindow, so this is a separate fixed overlay ABOVE #gl, sized/faded per-frame by the scene loop to hug the windowed card and dissolve as it opens fullscreen. */
-  #sceneSheen{position:fixed;left:0;top:0;width:0;height:0;box-sizing:border-box;pointer-events:none;opacity:0;z-index:5;padding:3.5px;
-    background:radial-gradient(300px circle at var(--mx,50%) var(--my,50%), rgba(230,238,255,1) 0%, rgba(150,180,255,.98) 15%, rgba(255,138,61,.92) 36%, transparent 64%);
-    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);-webkit-mask-composite:xor;
-    mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);mask-composite:exclude;
-    filter:drop-shadow(0 0 8px rgba(160,190,255,.6)) drop-shadow(0 0 14px rgba(255,138,61,.35));}
+  .card{position:relative;background:var(--bg-deep);border:1px solid var(--hairline);padding:14px 14px 18px;border-radius:14px;box-shadow:0 16px 38px rgba(0,0,0,.42),0 3px 10px rgba(0,0,0,.30)}   /* resting elevation so the plain cards don't sit flat */
   .card model-viewer{width:100%;aspect-ratio:1/1.05;background:radial-gradient(80% 90% at 50% 38%,#0f1c3a 0%,var(--bg-deep) 70%);border-radius:10px;overflow:hidden}
   /* FOCUS-PULL featured card (Lusion-style still + depth map) */
-  .card.featured{grid-column:1/-1;background:none;border:0;padding:0}
+  .card.featured{grid-column:1/-1;background:none;border:0;padding:0;box-shadow:none}   /* no card-box shadow; the shadow rides on .fwrap (the image) instead */
   .card.featured:hover{transform:none;box-shadow:none}
-  .card.featured .fwrap{position:relative;border:1px solid var(--hairline);border-radius:12px;overflow:hidden;background:var(--bg-deep)}
+  .card.featured .fwrap{position:relative;border:1px solid var(--hairline);border-radius:12px;overflow:hidden;background:var(--bg-deep);box-shadow:0 20px 50px rgba(0,0,0,.46),0 4px 12px rgba(0,0,0,.32)}
   .card.featured h3{margin-top:16px}
   canvas.fcard{display:block;width:100%;height:auto;background:var(--bg-deep)}
   .card h3{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.06em;margin:14px 4px 3px}
@@ -193,6 +179,7 @@
   body{background:#0a1633}
   #gl{opacity:0;pointer-events:none;z-index:4}   /* v3: raised above the body — the tokonoma scene shows OVER the site during How-it-works; opacity driven by the #process section */
   #bleed2{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none;display:none}   /* v3: EXIT strips scrim — Method-A shader ABOVE #gl (z5>z4). Samples the live scene + eats it → reveals the site. #gl fades to 0 during the exit so eaten columns show the DOM below. */
+  #fx{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none}   /* v3: emissive card-frame bloom — additive glow lines above #gl, drawn only where a card is hover-lit / magnetized (else fully transparent) */
   #coolVeil,#hint{display:none!important}   /* v3: #ar ("View in 3D") is un-hidden — it's the already-wired inspect pill, shown at the bottom of the fullscreen scene */
   /* v3 How-it-works: heading at top, an EMBEDDED scene window (Lusion astronaut framing) directly under it, then a tall runway; the resume copy is pushed to the very bottom (site continues after the scene). */
   #process{min-height:440vh;position:relative}
@@ -216,7 +203,7 @@
 <canvas id="bleed"></canvas><!-- v3: strips Print Pass scrim (WebGL2) — white hero eaten to reveal the site -->
 <canvas id="gl"></canvas>
 <canvas id="bleed2"></canvas><!-- v3: EXIT wipe (Method A) — a 2nd strips scrim that SAMPLES the live tokonoma render and eats it strip-by-strip to reveal the site below (z above #gl). Replaces the per-frame CSS mask. -->
-<div id="sceneSheen" aria-hidden="true"></div><!-- v3: specular-sheen ring for the windowed scene card — fixed overlay ABOVE #gl, positioned + faded per-frame by the scene loop. --><div id="coolVeil" aria-hidden="true"></div>
+<canvas id="fx" aria-hidden="true"></canvas><!-- v3: EMISSIVE card frames — glowing hover-lit + cursor-magnetized borders (real bloom) around the portfolio cards, compare photo, and windowed scene card. Fixed overlay above #gl. --><div id="coolVeil" aria-hidden="true"></div>
 <div id="track"></div>
 <div id="release" aria-hidden="true"></div>
 <div id="loader">loading scene…</div>
@@ -592,7 +579,6 @@ let targetF=0, curF=0, curJ=0, xrReveal=0, deliverFade=0, bodyP=0, lastFormF=-1;
 const trackEl = document.getElementById('track');
 const processEl = document.getElementById('process');
 const sceneWindowEl = document.getElementById('sceneWindow');   // the inline card the canvas clip-path tracks (Lusion astronaut window→fullscreen)
-const sceneSheenEl = document.getElementById('sceneSheen');      // specular-sheen ring overlay for the windowed scene card (sized/faded per-frame below)
 // v3: the cinematic is driven by scroll THROUGH the #process (How-it-works) section, not the page hero track. 0 as its top hits the viewport top → 1 as its bottom reaches the viewport bottom.
 function scrollProgress(){ const r=processEl.getBoundingClientRect(); const sc=r.height-innerHeight; return sc>0?clamp(-r.top/sc):0; }
 // ===== PROGRESS SPLIT: raw scroll 0..SPLIT drives the materialize, SPLIT..1 drives the journey =====
@@ -1009,7 +995,7 @@ let winExpand = 0;   // v3 Lusion framing: card→fullscreen progress, eased on 
 let _exitP = 0;      // v3: raw exit-wipe scalar (.67→1), handed to the #bleed2 scrim AFTER composer.render so the scrim samples a fresh scene frame
 
 function loop(){
-  if(!sceneActive){ rafPaused=true; cv.style.opacity='0'; arEl.classList.remove('show'); if(window.__exitWipe) window.__exitWipe.hide(); if(sceneSheenEl) sceneSheenEl.style.opacity='0'; return; }   // v3: render ONLY while How-it-works is on screen; pill + exit scrim + sheen hidden with it
+  if(!sceneActive){ rafPaused=true; cv.style.opacity='0'; arEl.classList.remove('show'); if(window.__exitWipe) window.__exitWipe.hide(); window.__sceneFrame=null; return; }   // v3: render ONLY while How-it-works is on screen; pill + exit scrim + scene frame off with it
   const _now = performance.now(); let _dt = (_now - _pLast)/1000; _pLast = _now; _dt = _dt>0 ? Math.min(_dt, 1/30) : 1/60;
   mouseSpring.update(_dt, _mTarget);                          // parallax spring ticks every frame → never jumps when re-entering the journey
   const sp = (!isMobile && !inspectMode) ? scrollProgress() : 0;   // scroll THROUGH the How-it-works section
@@ -1098,10 +1084,9 @@ function loop(){
   const cT = Math.max(0, wr.top)*k, cL = Math.max(0, wr.left)*k,
         cR = Math.max(0, innerWidth - wr.right)*k, cB = Math.max(0, innerHeight - wr.bottom)*k;
   cv.style.clipPath = `inset(${cT.toFixed(1)}px ${cR.toFixed(1)}px ${cB.toFixed(1)}px ${cL.toFixed(1)}px round ${(16*k).toFixed(1)}px)`;
-  // sheen ring hugs the scene's VISIBLE clipped rect and fades as it opens fullscreen (k = 1-expand: 1 windowed → 0 fullscreen). Hidden during inspect + the exit wipe.
-  if(sceneSheenEl){ const s=sceneSheenEl.style, o = (!inspectMode && sp<0.6) ? k : 0;
-    if(o>0.001){ s.left=cL.toFixed(1)+'px'; s.top=cT.toFixed(1)+'px'; s.width=Math.max(0,innerWidth-cL-cR).toFixed(1)+'px'; s.height=Math.max(0,innerHeight-cT-cB).toFixed(1)+'px'; s.borderRadius=(16*k).toFixed(1)+'px'; }
-    s.opacity=o.toFixed(3); }
+  // feed the scene's VISIBLE clipped rect to the emissive frame overlay; lit while windowed, fades as it opens (k = 1-expand). Off during inspect + the exit wipe.
+  { const o = (!inspectMode && sp<0.6) ? k : 0;
+    window.__sceneFrame = o>0.001 ? { l:cL, t:cT, w:Math.max(0,innerWidth-cL-cR), h:Math.max(0,innerHeight-cT-cB), rad:16*k, lit:o } : null; }
   // ===== PASS 2 — EXIT WIPE (Method A): the strips now live in the #bleed2 shader scrim — it SAMPLES the live scene, eats it strip-by-strip (ink-edge + SOD glide, same engine as the load), and reveals the site below. Here we only compute the scroll scalar + hand #gl off to the scrim (drawn after composer.render, so it samples a fresh frame). =====
   const EX_START = 0.67;
   const exitP = (!inspectMode) ? clamp((sp - EX_START)/(1 - EX_START)) : 0;   // 0 at .67 → 1 at footer; RAW here, damped inside the scrim
@@ -1544,21 +1529,61 @@ try{(function(){
 })();}catch(e){ console.warn('scan-field bg off:',e); }
 </script>
 
-<!-- ===== PORTFOLIO CARD SPECULAR SHEEN: feed the cursor position (--mx/--my) to each card frame so the ::after highlight rakes the edge on hover. Plain cards ring the card; the featured card rings its .fwrap image. ===== -->
+<!-- ===== EMISSIVE CARD FRAMES: hover-lit + cursor-magnetized glowing borders (real bloom) on the portfolio cards, compare photo + windowed scene card. Solid line = a stroked rounded-rect path whose points bulge toward the cursor; bloom = an offscreen buffer composited at growing blur radii (additive). Draws only where something is lit → idle-cheap. ===== -->
 <script>
 try{(function(){
-  const frames=[...document.querySelectorAll('.cards .card:not(.featured), .cards .card.featured .fwrap, #cmp')];
-  frames.forEach(el=>{
-    el.addEventListener('pointermove', e=>{ const r=el.getBoundingClientRect(); if(!r.width) return;
-      el.style.setProperty('--mx', (((e.clientX-r.left)/r.width)*100).toFixed(1)+'%');
-      el.style.setProperty('--my', (((e.clientY-r.top)/r.height)*100).toFixed(1)+'%'); });
-  });
-  // scene-card sheen: the overlay is positioned by the scene loop; track the cursor against its LIVE rect
-  const ss=document.getElementById('sceneSheen');
-  if(ss) addEventListener('pointermove', e=>{ const r=ss.getBoundingClientRect(); if(!r.width) return;
-    ss.style.setProperty('--mx', (((e.clientX-r.left)/r.width)*100).toFixed(1)+'%');
-    ss.style.setProperty('--my', (((e.clientY-r.top)/r.height)*100).toFixed(1)+'%'); });
-})();}catch(e){ console.warn('card sheen off:',e); }
+  const fx=document.getElementById('fx'); if(!fx) return;
+  const fctx=fx.getContext('2d'), oc=document.createElement('canvas'), octx=oc.getContext('2d');
+  let FW,FH,FDPR;
+  function fxsize(){ FDPR=Math.min(devicePixelRatio||1,2); FW=innerWidth; FH=innerHeight;
+    fx.width=oc.width=Math.round(FW*FDPR); fx.height=oc.height=Math.round(FH*FDPR);
+    fx.style.width=FW+'px'; fx.style.height=FH+'px'; fctx.setTransform(FDPR,0,0,FDPR,0,0); octx.setTransform(FDPR,0,0,FDPR,0,0); }
+  fxsize(); addEventListener('resize',fxsize);
+  let gmx=innerWidth/2, gmy=innerHeight/2, sx=gmx, sy=gmy;
+  addEventListener('pointermove', e=>{ gmx=e.clientX; gmy=e.clientY; });
+  const R=185, MAXPULL=54;
+  const targets=[
+    ...[...document.querySelectorAll('.cards .card:not(.featured)')].map(el=>({el,rad:14,hov:0})),
+    ...[...document.querySelectorAll('.cards .card.featured .fwrap')].map(el=>({el,rad:12,hov:0})),
+    ...[...document.querySelectorAll('#cmp')].map(el=>({el,rad:12,hov:0})),
+  ];
+  function roundedPts(x,y,w,h,rad,gap){ rad=Math.max(0,Math.min(rad,w/2,h/2)); const out=[];
+    const edge=(x1,y1,x2,y2)=>{ const L=Math.hypot(x2-x1,y2-y1), n=Math.max(1,Math.round(L/gap)); for(let i=0;i<n;i++){ const t=i/n; out.push([x1+(x2-x1)*t,y1+(y2-y1)*t]); } };
+    const arc=(cx,cy,a0,a1)=>{ const L=Math.abs(a1-a0)*rad, n=Math.max(1,Math.round(L/gap)); for(let i=0;i<n;i++){ const a=a0+(a1-a0)*(i/n); out.push([cx+Math.cos(a)*rad,cy+Math.sin(a)*rad]); } };
+    const HP=Math.PI/2, PI=Math.PI;
+    edge(x+rad,y,x+w-rad,y); arc(x+w-rad,y+rad,-HP,0); edge(x+w,y+rad,x+w,y+h-rad); arc(x+w-rad,y+h-rad,0,HP);
+    edge(x+w-rad,y+h,x+rad,y+h); arc(x+rad,y+h-rad,HP,PI); edge(x,y+h-rad,x,y+rad); arc(x+rad,y+rad,PI,PI+HP);
+    return out; }
+  function drawFrame(x,y,w,h,rad,base){ const pts=roundedPts(x,y,w,h,rad,7), N=pts.length, D=new Array(N); let drew=false;
+    for(let i=0;i<N;i++){ let px=pts[i][0], py=pts[i][1]; const dx=sx-px,dy=sy-py,d=Math.hypot(dx,dy)||1; let m=0;
+      if(d<R){ m=1-d/R; const pull=m*m*MAXPULL; px+=dx/d*pull; py+=dy/d*pull; }
+      D[i]={x:px,y:py,e:base+m*1.3,w:Math.min(1,m*1.3)}; }        // e=energy (HDR), w=warmth
+    for(let i=0;i<N;i++){ const a=D[i], b=D[(i+1)%N], e=(a.e+b.e)*0.5; if(e<0.02) continue; drew=true;
+      const w2=(a.w+b.w)*0.5, rr=Math.round(80+w2*175), gg=Math.round(130+w2*30), bb=Math.round(255-w2*185);
+      octx.strokeStyle='rgba('+rr+','+gg+','+bb+','+Math.min(1,0.32+e).toFixed(3)+')'; octx.lineWidth=1.8+e*3.2;
+      octx.beginPath(); octx.moveTo(a.x,a.y); octx.lineTo(b.x,b.y); octx.stroke();
+      if(e>0.7){ octx.strokeStyle='rgba(255,255,255,'+Math.min(1,(e-0.7)*1.2).toFixed(3)+')'; octx.lineWidth=1+e*1.5;
+        octx.beginPath(); octx.moveTo(a.x,a.y); octx.lineTo(b.x,b.y); octx.stroke(); } }
+    return drew; }
+  function loop(){ sx+=(gmx-sx)*0.18; sy+=(gmy-sy)*0.18;
+    octx.clearRect(0,0,FW,FH); octx.globalCompositeOperation='lighter'; octx.lineCap='round'; octx.lineJoin='round';
+    let lit=false;
+    for(const t of targets){ const r=t.el.getBoundingClientRect(); if(!r.width || r.bottom<0 || r.top>innerHeight) continue;
+      const inside = sx>=r.left-8 && sx<=r.right+8 && sy>=r.top-8 && sy<=r.bottom+8;
+      t.hov += ((inside?1:0)-t.hov)*0.15;
+      if(drawFrame(r.left,r.top,r.width,r.height,t.rad,t.hov*0.8)) lit=true; }
+    const sf=window.__sceneFrame; if(sf && sf.w>0 && drawFrame(sf.l,sf.t,sf.w,sf.h,sf.rad,sf.lit*0.8)) lit=true;   // windowed scene card (lit by its windowed-ness, not hover)
+    octx.globalCompositeOperation='source-over';
+    if(lit){ fctx.clearRect(0,0,FW,FH); fctx.globalCompositeOperation='lighter';
+      fctx.filter='none';       fctx.drawImage(oc,0,0,FW,FH);
+      fctx.filter='blur(4px)';  fctx.drawImage(oc,0,0,FW,FH);
+      fctx.filter='blur(12px)'; fctx.drawImage(oc,0,0,FW,FH);
+      fctx.filter='blur(28px)'; fctx.globalAlpha=0.85; fctx.drawImage(oc,0,0,FW,FH);
+      fctx.filter='none'; fctx.globalAlpha=1; fctx.globalCompositeOperation='source-over'; }
+    else fctx.clearRect(0,0,FW,FH);
+    requestAnimationFrame(loop); }
+  loop();
+})();}catch(e){ console.warn('emissive frames off:',e); }
 </script>
 </body>
 </html>

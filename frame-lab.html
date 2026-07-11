@@ -18,6 +18,8 @@
     border:1px solid transparent; border-radius:8px; background:transparent; transition:.18s; }
   .btn:hover{ background:rgba(120,150,255,.12); }
   .btn.active{ background:var(--cobalt); color:#fff; border-color:rgba(255,255,255,.25); }
+  #fx{ position:fixed; inset:0; pointer-events:none; z-index:5; opacity:0; transition:opacity .25s; }
+  body[data-frame=emissive] #fx, body[data-frame=emissive2] #fx{ opacity:1; }
   #cap{ max-width:760px; margin:18px auto 0; text-align:center; font-size:12.5px; line-height:1.6; color:#aab8e6; padding:0 16px; }
   #cap b{ color:#eaf; } #cap .k{ color:var(--warm); }
   /* stage */
@@ -104,11 +106,16 @@
     <button class="btn" data-f="glass">Frosted bevel</button>
     <button class="btn" data-f="sheen">Specular sheen</button>
     <button class="btn" data-f="draw">Border draw</button>
+    <button class="btn" data-f="emissive">Emissive edge</button>
+    <button class="btn" data-f="emissive2">Emissive · hover-lit</button>
   </div>
   <div id="cap"></div>
   <div id="stage"></div>
+  <canvas id="fx"></canvas>
+
 
 <script>
+const TAU=Math.PI*2;
 const cards=[['Shinobu · whisky','01'],['Atlas · fragrance','02'],['Nori · ceramic','03']];
 const stage=document.getElementById('stage');
 stage.innerHTML = cards.map(([tag,idx])=>`
@@ -147,7 +154,9 @@ const CAP={
   sweep:'<b>Scan sweep</b> — hover and a light bar crosses the image, flashing a wireframe underneath. Scan → Rebuild in miniature, right on the card.',
   glass:'<b>Frosted bevel</b> — an inset glass edge that matches the buttons + drawer. The quiet, consistent option.',
   sheen:'<b>Specular sheen</b> — a hairline border with a bright specular spot that follows your cursor, cobalt into warm. Glass catching light.',
-  draw:'<b>Border draw</b> — the frame traces itself in on hover, the same "printed" language as the strip wipes.'
+  draw:'<b>Border draw</b> — the frame traces itself in on hover, the same "printed" language as the strip wipes.',
+  emissive:'<b>Emissive edge</b> — the border is built from glowing points like the tokonoma cloud (additive + bloom), and they <span class="k">magnetize</span> toward your cursor — the edge bulges and warms where you point, like the WhatsApp pill leaning. Move slowly along an edge.',
+  emissive2:'<b>Emissive · hover-lit</b> — same real bloom, but hovering a card ignites its WHOLE border in cobalt light, and the cursor still <span class="k">magnetizes</span>: the edge bulges and goes warm-hot where you point.'
 };
 document.querySelectorAll('.btn').forEach(b=> b.addEventListener('click', ()=>{
   document.body.dataset.frame=b.dataset.f;
@@ -155,6 +164,65 @@ document.querySelectorAll('.btn').forEach(b=> b.addEventListener('click', ()=>{
   document.getElementById('cap').innerHTML=CAP[b.dataset.f];
 }));
 document.getElementById('cap').innerHTML=CAP.reticle;
+
+/* ===== EMISSIVE EDGE — bright perimeter points bloomed into REAL light: drawn to an offscreen buffer, then composited back at growing blur radii (additive) so hot cores overexpose and bleed, tokonoma-style. Magnetized toward the cursor. ===== */
+const fx=document.getElementById('fx'), fctx=fx.getContext('2d');
+const oc=document.createElement('canvas'), octx=oc.getContext('2d');
+let FW,FH,FDPR;
+function fxsize(){ FDPR=Math.min(devicePixelRatio||1,2); FW=innerWidth; FH=innerHeight;
+  fx.width=oc.width=Math.round(FW*FDPR); fx.height=oc.height=Math.round(FH*FDPR);
+  fx.style.width=FW+'px'; fx.style.height=FH+'px';
+  fctx.setTransform(FDPR,0,0,FDPR,0,0); octx.setTransform(FDPR,0,0,FDPR,0,0); }
+fxsize(); addEventListener('resize',fxsize);
+let gmx=innerWidth/2, gmy=innerHeight/2, sx=gmx, sy=gmy;
+addEventListener('pointermove', e=>{ gmx=e.clientX; gmy=e.clientY; });
+function perim(r, gap){ const W=r.width,H=r.height, per=2*(W+H), n=Math.max(12,Math.round(per/gap)), out=[];
+  for(let i=0;i<n;i++){ const d=(i/n)*per; let x,y;
+    if(d<W){x=r.left+d;y=r.top;} else if(d<W+H){x=r.right;y=r.top+(d-W);}
+    else if(d<2*W+H){x=r.right-(d-W-H);y=r.bottom;} else {x=r.left;y=r.bottom-(d-2*W-H);}
+    out.push([x,y]); } return out; }
+const R=185, MAXPULL=54;
+const hov=cardEls.map(()=>0);   // per-card hover ease (0..1) — for the hover-lit mode
+function fxloop(){
+  const mode=document.body.dataset.frame;
+  if(mode==='emissive' || mode==='emissive2'){
+    sx+=(gmx-sx)*0.18; sy+=(gmy-sy)*0.18;
+    // 1) bright points → offscreen (HDR: hot points clip past white so the bloom blazes)
+    octx.clearRect(0,0,FW,FH); octx.globalCompositeOperation='lighter';
+    octx.lineCap='round'; octx.lineJoin='round';
+    cardEls.forEach((c,ci)=>{ const r=c.getBoundingClientRect();
+      const inside = sx>=r.left-8 && sx<=r.right+8 && sy>=r.top-8 && sy<=r.bottom+8;
+      hov[ci] += ((inside?1:0)-hov[ci])*0.15;
+      const base = (mode==='emissive2') ? hov[ci]*0.8 : 0;   // emissive2: whole border lights on hover
+      // displace each perimeter point by the magnet, carry its energy/warmth
+      const pts=perim(r,7), N=pts.length, D=new Array(N);
+      for(let i=0;i<N;i++){ let x=pts[i][0], y=pts[i][1];
+        const dx=sx-x,dy=sy-y,d=Math.hypot(dx,dy)||1; let m=0;
+        if(d<R){ m=1-d/R; const pull=m*m*MAXPULL; x+=dx/d*pull; y+=dy/d*pull; }
+        D[i]={x,y,e:base+m*1.3,w:Math.min(1,m*1.3)}; }                 // e=energy (HDR), w=warmth
+      // stroke the CLOSED path as short segments so it reads as one solid line with per-spot colour
+      for(let i=0;i<N;i++){ const a=D[i], b=D[(i+1)%N], e=(a.e+b.e)*0.5;
+        if(e<0.02) continue; const w=(a.w+b.w)*0.5;
+        const rr=Math.round(80+w*175), gg=Math.round(130+w*30), bb=Math.round(255-w*185);
+        octx.strokeStyle='rgba('+rr+','+gg+','+bb+','+Math.min(1,0.32+e).toFixed(3)+')';
+        octx.lineWidth=1.8+e*3.2;
+        octx.beginPath(); octx.moveTo(a.x,a.y); octx.lineTo(b.x,b.y); octx.stroke();
+        if(e>0.7){ octx.strokeStyle='rgba(255,255,255,'+Math.min(1,(e-0.7)*1.2).toFixed(3)+')';   // white-hot core
+          octx.lineWidth=1+e*1.5; octx.beginPath(); octx.moveTo(a.x,a.y); octx.lineTo(b.x,b.y); octx.stroke(); }
+      }
+    });
+    octx.globalCompositeOperation='source-over';
+    // 2) bloom = the same buffer stacked at growing blur radii, additively → light bleeds like the real thing
+    fctx.clearRect(0,0,FW,FH); fctx.globalCompositeOperation='lighter';
+    fctx.filter='none';       fctx.drawImage(oc,0,0,FW,FH);
+    fctx.filter='blur(4px)';  fctx.drawImage(oc,0,0,FW,FH);
+    fctx.filter='blur(12px)'; fctx.drawImage(oc,0,0,FW,FH);
+    fctx.filter='blur(28px)'; fctx.globalAlpha=0.85; fctx.drawImage(oc,0,0,FW,FH);
+    fctx.filter='none'; fctx.globalAlpha=1; fctx.globalCompositeOperation='source-over';
+  }
+  requestAnimationFrame(fxloop);
+}
+fxloop();
 </script>
 </body>
 </html>
