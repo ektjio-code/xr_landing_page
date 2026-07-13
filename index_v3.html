@@ -1763,17 +1763,24 @@ function tapPush(clientX, clientY){                              // tap → shov
     const dx=g.home.x-wx, dy=g.home.y-wy, d=Math.hypot(dx,dy);
     if(d<K.shr && d>1e-3){ const f=(1-d/K.shr)*300; g.voff.x+=dx/d*f; g.voff.y+=dy/d*f; } }
 }
+function distToSeg(px,py,x0,y0,x1,y1){ const dx=x1-x0,dy=y1-y0,L2=dx*dx+dy*dy; let t=L2>0?((px-x0)*dx+(py-y0)*dy)/L2:0; t=Math.max(0,Math.min(1,t)); return Math.hypot(px-(x0+t*dx), py-(y0+t*dy)); }
+function sweepTopple(x0,y0,x1,y1){                               // topple every idle letter within a fingertip of the swipe segment (fixes fast-swipe skipping)
+  for(const g of glyphs){ if(g.state!=='idle') continue;
+    if(distToSeg(g.mesh.position.x,g.mesh.position.y,x0,y0,x1,y1) < Math.max(g.hw,g.hh)+14) knock(g); }
+}
 addEventListener('pointerdown', e=>{ if(e.pointerType!=='mouse'){ tStart={x:e.clientX,y:e.clientY}; tPrev={x:e.clientX,y:e.clientY,t:performance.now()}; tMoved=false; } });
 addEventListener('pointermove', e=>{
   if(e.pointerType==='mouse' || !tStart) return;
   const dx=e.clientX-tStart.x, dy=e.clientY-tStart.y;
   if(Math.hypot(dx,dy)>8) tMoved=true;
-  if(Math.abs(dx) > Math.abs(dy)){                               // horizontal-dominant → drive the cursor (shove + topple-through)
+  if(Math.abs(dx) > Math.abs(dy)){                               // horizontal-dominant → shove neighbours + topple the swiped path
     const r=canvas.getBoundingClientRect();
-    const p=new THREE.Vector2((e.clientX-r.left)-W/2, -((e.clientY-r.top)-H/2));
+    const cxp=(e.clientX-r.left)-W/2, cyp=-((e.clientY-r.top)-H/2);
+    const pxp=(tPrev.x-r.left)-W/2,   pyp=-((tPrev.y-r.top)-H/2);
     const t=performance.now(), dt=Math.max((t-tPrev.t)/1000,1/120);
-    curVel.set(THREE.MathUtils.clamp((p.x-curp.x)/dt,-2000,2000), THREE.MathUtils.clamp((p.y-curp.y)/dt,-2000,2000));
-    curp.copy(p); lastMove=t;
+    curVel.set(THREE.MathUtils.clamp((cxp-curp.x)/dt,-2000,2000), THREE.MathUtils.clamp((cyp-curp.y)/dt,-2000,2000));
+    curp.set(cxp,cyp); lastMove=t;
+    if(active && ready) sweepTopple(pxp,pyp,cxp,cyp);            // topple every letter this segment crosses (reliable on fast swipes)
   }
   tPrev={x:e.clientX,y:e.clientY,t:performance.now()};
 });
@@ -1811,9 +1818,11 @@ function frame(){
   const moving = (t-lastMove) < 120;
   for(const g of glyphs){
     if(g.state==='idle'){
-      const inside = moving && Math.abs(curp.x-g.mesh.position.x)<g.hw && Math.abs(curp.y-g.mesh.position.y)<g.hh;
-      if(inside && !g.wasIn){ g.wasIn=true; knock(g); continue; }
-      g.wasIn=inside;
+      if(!IS_COARSE){                                            // desktop: cursor point-hit topple. Mobile topples via sweepTopple (swept path) instead.
+        const inside = moving && Math.abs(curp.x-g.mesh.position.x)<g.hw && Math.abs(curp.y-g.mesh.position.y)<g.hh;
+        if(inside && !g.wasIn){ g.wasIn=true; knock(g); continue; }
+        g.wasIn=inside;
+      }
       let tx=0,ty=0;
       const dx=g.home.x-curp.x, dy=g.home.y-curp.y, d=Math.hypot(dx,dy);
       if(moving && d<K.shr && d>1e-3){ const f=1-d/K.shr; tx=dx/d*K.shd*f; ty=dy/d*K.shd*f; }
