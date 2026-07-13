@@ -21,7 +21,7 @@
   #track{position:relative;width:100%;height:120vh;z-index:0;pointer-events:none} /* v3: short runway — ~0.2 screen resting hero, then the strips wipe reveals the site over the release runway. (was 700vh cinematic) */
   #release{display:none} /* v3: removed the old canvas-release runway — the body content now sits directly behind the strips scrim so Real vs Render prints up THROUGH the wipe (no empty settle-then-scroll) */
   #compare{border-top:none} /* first body section emerges from the void with no seam line */
-  @media (pointer:coarse){ body{overflow:hidden} #track{height:100vh} }
+  @media (pointer:coarse){ #track{height:100vh} }   /* v3 mobile port: overflow-hidden scroll-lock LIFTED so mobile scrolls natively (topple hero + body reachable). How-it-works touch handling still TODO. */
   :root{ --ink:#f3ece1; --muted:#9a8c79; --accent:#e8a05c; }
   /* ===== DRAWER: the corner XRZENO is the site's menu / escape hatch (replaces the old static #brand; z-index 100, above everything). Cold navy panel, warm-orange actionable accents to match the site buttons. ===== */
   #drawerCtl{position:fixed;top:15px;left:18px;z-index:100;display:flex;align-items:center;gap:8px;background:none;border:0;cursor:pointer;color:#f0ece4;font-family:'Montserrat',system-ui,sans-serif;font-size:12px;letter-spacing:.26em;font-weight:700;padding:8px;transition:letter-spacing .25s}
@@ -1739,7 +1739,9 @@ function buildGlyphs(){
 }
 
 let curp=new THREE.Vector2(-1e4,-1e4), curVel=new THREE.Vector2(), haveCur=false, lastMove=0, cx=-200, cy=-200;
+// MOUSE (desktop): swipe the cursor THROUGH letters
 addEventListener('pointermove', e=>{
+  if(e.pointerType!=='mouse') return;
   cx=e.clientX; cy=e.clientY;
   cursorEl.style.transform=`translate(${cx}px,${cy}px)`;
   const r=canvas.getBoundingClientRect();                        // canvas scrolls with the page → map pointer via its live rect
@@ -1750,6 +1752,19 @@ addEventListener('pointermove', e=>{
   curp.copy(p); lastMove=t; haveCur=true;
 });
 addEventListener('pointerleave', ()=>{ curp.set(-1e4,-1e4); curVel.set(0,0); });
+// TOUCH (mobile): TAP a letter to topple it; a drag just scrolls (no capture → native scroll untouched)
+let tStart=null, tMoved=false;
+addEventListener('pointerdown', e=>{ if(e.pointerType!=='mouse'){ tStart={x:e.clientX,y:e.clientY}; tMoved=false; } });
+addEventListener('pointermove', e=>{ if(e.pointerType!=='mouse' && tStart && Math.hypot(e.clientX-tStart.x,e.clientY-tStart.y)>12) tMoved=true; }, {passive:true});
+addEventListener('pointerup', e=>{
+  if(e.pointerType==='mouse' || !tStart){ tStart=null; return; }
+  if(!tMoved && active && ready){                                // a tap (not a scroll) over a letter topples it
+    const r=canvas.getBoundingClientRect();
+    const wx=(e.clientX-r.left)-W/2, wy=-((e.clientY-r.top)-H/2);
+    for(const g of glyphs){ if(g.state==='idle' && Math.abs(wx-g.mesh.position.x)<g.hw && Math.abs(wy-g.mesh.position.y)<g.hh){ knock(g); break; } }
+  }
+  tStart=null;
+});
 
 function knock(g){
   const p=g.mesh.position;

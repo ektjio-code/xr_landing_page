@@ -208,7 +208,9 @@ function buildGlyphs(){
 let cur=new THREE.Vector2(-1e4,-1e4), curVel=new THREE.Vector2(), haveCur=false, lastMove=0;
 let cx=-200, cy=-200;                          // cursor in client px (drives the DOM ring + the haze)
 const cursorEl=document.getElementById('cursor');
+// MOUSE (desktop): swipe the cursor THROUGH letters
 addEventListener('pointermove', e=>{
+  if(e.pointerType!=='mouse') return;
   cx=e.clientX; cy=e.clientY;
   cursorEl.style.transform=`translate(${cx}px,${cy}px)`;
   const p=new THREE.Vector2(sx2w(e.clientX), sy2w(e.clientY));
@@ -219,6 +221,18 @@ addEventListener('pointermove', e=>{
   cur.copy(p); lastMove=t; haveCur=true;
 });
 addEventListener('pointerleave', ()=>{ cur.set(-1e4,-1e4); curVel.set(0,0); });
+// TOUCH (mobile): TAP a letter to topple it; a drag just scrolls (no capture → native scroll untouched)
+let tStart=null, tMoved=false;
+addEventListener('pointerdown', e=>{ if(e.pointerType!=='mouse'){ tStart={x:e.clientX,y:e.clientY}; tMoved=false; } });
+addEventListener('pointermove', e=>{ if(e.pointerType!=='mouse' && tStart && Math.hypot(e.clientX-tStart.x,e.clientY-tStart.y)>12) tMoved=true; }, {passive:true});
+addEventListener('pointerup', e=>{
+  if(e.pointerType==='mouse' || !tStart){ tStart=null; return; }
+  if(!tMoved && font){                                       // a tap (not a scroll) over a letter topples it
+    const wx=sx2w(e.clientX), wy=sy2w(e.clientY);
+    for(const g of glyphs){ if(g.state==='idle' && Math.abs(wx-g.mesh.position.x)<g.hw && Math.abs(wy-g.mesh.position.y)<g.hh){ knock(g); break; } }
+  }
+  tStart=null;
+});
 
 // ---- knock a glyph down ----
 function knock(g){
