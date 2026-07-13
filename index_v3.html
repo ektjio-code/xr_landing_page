@@ -151,6 +151,7 @@
 
   /* ===== DRAMATIC LAYER (Lusion, cranked — no more subtlety) ===== */
   #liquidBg{position:fixed;inset:0;z-index:2;opacity:0;pointer-events:none;filter:blur(5px)}   /* v3: squiggle bg, just slightly out of focus (was 46px metaball melt) */
+  @media (pointer:coarse){ #liquidBg{filter:none} }   /* mobile scroll-jank fix: a FIXED fullscreen BLURRED canvas is re-composited every scroll frame (the #1 cause of the jumpy fast-scroll). Drop the blur — the additive-glow dots stay soft on their own. */
   /* (custom cursor removed per feedback — native cursor stays) */
   /* fluid headings — words flow up out of the mask with a blur-clear + soft overshoot settle */
   .w-split .wi{ transform:translateY(125%) rotate(9deg); transform-origin:0% 100%; filter:blur(7px); }
@@ -189,6 +190,11 @@
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   #glm{display:none}
   @media (pointer:coarse){ #glm{display:block;position:fixed;inset:0;width:100vw;height:100vh;z-index:4;pointer-events:none;opacity:0;transition:opacity .3s} }   /* mobile Shinobu scene canvas (How-it-works) */
+  #glmHint{display:none;position:fixed;left:50%;bottom:32px;transform:translateX(-50%);z-index:6;pointer-events:none;
+    color:#eaf1ff;font-family:'Montserrat',system-ui,sans-serif;font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+    opacity:0;transition:opacity .5s ease;text-shadow:0 2px 12px rgba(0,0,0,.6)}   /* mobile "scroll to continue" cue on the Shinobu scene */
+  #glmHint.show{opacity:1;animation:introPulse 2.6s ease-in-out infinite}
+  @media (pointer:coarse){ #glmHint{display:block} }
   #bleed2{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none;display:none}   /* v3: EXIT strips scrim — Method-A shader ABOVE #gl (z5>z4). Samples the live scene + eats it → reveals the site. #gl fades to 0 during the exit so eaten columns show the DOM below. */
   #fx{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none}   /* v3: emissive card-frame bloom — additive glow lines above #gl, drawn only where a card is hover-lit / magnetized (else fully transparent) */
   #coolVeil,#hint{display:none!important}   /* v3: #ar ("View in 3D") is un-hidden — it's the already-wired inspect pill, shown at the bottom of the fullscreen scene */
@@ -252,6 +258,7 @@
 
 <canvas id="liquidBg" aria-hidden="true"></canvas>
 <canvas id="glm" aria-hidden="true"></canvas><!-- v3 MOBILE How-it-works: art-directed Shinobu materialize (ported from old index.html), scroll-driven -->
+<div id="glmHint" aria-hidden="true">Scroll to continue ↓</div><!-- mobile: cue on the Shinobu scene, on while it plays, off once the exit transition starts -->
 <div id="toppleCursor" aria-hidden="true"></div>
 <div id="rotateGate"><span>↻&ensp;Please rotate your device to portrait</span></div>
 <!-- ===== SITE BODY (concept skeleton) — living liquid backdrop; content flies in over it ===== -->
@@ -1538,6 +1545,7 @@ try{(function(){
   addEventListener('pointermove', e=>{ mx=e.clientX; my=e.clientY; });
 
   function frame(now){
+    if(window.__pauseLiquid){ requestAnimationFrame(frame); return; }   // opt (mobile): paused while the fullscreen #glm scene fully occludes this layer — no fullscreen 2D repaint + blur re-composite competing with the WebGL render (the blurred layer stays cached; resumes the instant the exit wipe reveals the site)
     cv.style.opacity='1';                                 // persistent site background — always on (the strips scrim hides it during the hero, then reveals it)
     pmx+=(mx-pmx)*0.10; pmy+=(my-pmy)*0.10;
     const t=now*0.001;
@@ -1940,7 +1948,7 @@ const [{GLTFLoader},{MeshSurfaceSampler},{EffectComposer},{RenderPass},{UnrealBl
   import('three/addons/postprocessing/OutputPass.js'),
   import('three/addons/environments/RoomEnvironment.js') ]);
 
-const cv=document.getElementById('glm'), processEl=document.getElementById('process'), sceneWindowEl=document.getElementById('sceneWindow');
+const cv=document.getElementById('glm'), processEl=document.getElementById('process'), sceneWindowEl=document.getElementById('sceneWindow'), glmHintEl=document.getElementById('glmHint');
 let W=innerWidth, H=innerHeight;
 const renderer=new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
@@ -2029,47 +2037,59 @@ function setForm(f){
 function scrollProgress(){ const r=processEl.getBoundingClientRect(), sc=r.height-innerHeight; return sc>0?Math.min(Math.max(-r.top/sc,0),1):0; }
 const clamp=v=>v<0?0:v>1?1:v;
 
-// zones across #process: windowed card 0–.06 · card opens (winExpand tween, armed at .06) · materialize .14–.44 · hold .44–.67 · EXIT strips wipe .67–1. EX_START matches the desktop wipe + the --faq-overlap math so the site (FAQ) is pinned behind before the bars rise.
+// zones across #process (pure scroll-scrub — autoplay/reverse scrapped): windowed card 0–.06 · card opens · materialize .14–.44 · hold .44–.67 · EXIT strips wipe .67–1.
 const EX_START=0.67;
-let targetF=0, curF=0, winExpand=0, active=false, raf=false, lastT=performance.now();
+let targetF=0, curF=0, winExpand=0, active=false, raf=false, lastT=performance.now(), userRotY=0;
 function loop(){
   if(!active){ raf=false; return; }
   const now=performance.now(), dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
   const sp=scrollProgress();
 
-  // ===== CARD → EXPAND (Lusion window framing): the scene sits framed in the #sceneWindow card, then TIME-tweens open to fullscreen once scroll arms it (never scroll-scrubbed → smooth + symmetric on reverse). =====
+  // ===== CARD → EXPAND (Lusion window framing): armed by scroll, TIME-tweened open. =====
   const wantExpand = sp>0.06 ? 1 : 0;
   winExpand += (wantExpand-winExpand)*(1-Math.pow(0.012,dt));   // ~0.7s ease, framerate-independent
   if(Math.abs(wantExpand-winExpand)<0.0006) winExpand=wantExpand;
   const expand=winExpand, k=1-expand;
 
-  targetF = clamp((sp-0.14)/0.30);                     // materialize AFTER the card starts opening
+  targetF = clamp((sp-0.14)/0.30);                     // materialize .14–.44 (scroll-scrubbed)
   curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
   setForm(curF);
   const formed=clamp((curF-0.55)/0.45);
   // windowed "ember": compress the scatter into a compact glow that fits the card (expand 0) → opens to the full shell as it expands; spin only as it opens.
   if(points){ const pulse=1+0.05*Math.sin(now*0.0016); points.scale.setScalar((0.12+0.88*expand)*(expand<0.99?pulse:1)); }
-  pivot.rotation.y = (curF*0.6 + now*0.00006)*expand;   // no spin while windowed
+  pivot.rotation.y = (curF*0.6 + now*0.00006)*expand + userRotY;   // materialize/idle spin + user turntable (horizontal drag)
   bloom.strength=0.85*(1-formed)*(0.5+0.5*expand); bloom.enabled=formed<1;   // dim the bloom while windowed so the ember glows warm, not blown to white
   const lit=1-0.6*formed; key.intensity=KEY0*lit; fill.intensity=FILL0*lit; rim.intensity=RIM0*lit; amb.intensity=AMB0*lit;
-  composer.render();
+  composer.render();   // always through the composer (matches the smooth old index — the scene was never the bottleneck)
 
   // clip the fullscreen canvas to the card's LIVE rect, lerp out to the full viewport by `expand` (rounded corners fade with k). Held fullscreen (k=0) through the exit.
   const wr=sceneWindowEl.getBoundingClientRect();
   const cT=Math.max(0,wr.top)*k, cL=Math.max(0,wr.left)*k, cR=Math.max(0,innerWidth-wr.right)*k, cB=Math.max(0,innerHeight-wr.bottom)*k;
   cv.style.clipPath = k>0.001 ? `inset(${cT.toFixed(1)}px ${cR.toFixed(1)}px ${cB.toFixed(1)}px ${cL.toFixed(1)}px round ${(18*k).toFixed(1)}px)` : 'none';
   // ===== EXIT (scene → website): the #bleed2 strips scrim SAMPLES this fresh #glm frame + eats it strip-by-strip, revealing the site (FAQ) below. #glm fades to 0 as the scrim takes over, so eaten columns never show the raw scene under it. =====
-  const exitP = clamp((sp-EX_START)/(1-EX_START));
+  const exitP = clamp((sp-EX_START)/(1-EX_START));      // exit scroll-driven
   if(exitP>0) cv.style.opacity = (1-clamp(exitP/0.05)).toFixed(3);   // brief cross-hand: #glm → 0 while the scrim still shows ~the full scene (nothing eaten yet) → invisible swap
   else if(cv.style.opacity!=='1') cv.style.opacity='1';              // scrolled back out of the exit → hand the scene back
+  window.__pauseLiquid = (winExpand>0.99 && exitP<=0.001);           // opt: freeze the occluded scan-field only while the scene FULLY covers the screen (not while windowed in the card, not during the exit reveal)
+  if(glmHintEl) glmHintEl.classList.toggle('show', exitP<0.001);      // "scroll to continue" — on while the scene plays, off the instant the exit transition begins
   if(window.__exitWipe) window.__exitWipe.frame(exitP);              // MUST be right after composer.render() → the #glm drawing buffer is still valid to sample
   requestAnimationFrame(loop);
 }
 addEventListener('resize',()=>{ W=innerWidth;H=innerHeight; renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix(); composer.setSize(W,H); });
 new IntersectionObserver(es=>es.forEach(e=>{ active=e.isIntersecting;
-  if(active){ cv.style.opacity='1'; if(!raf){ raf=true; loop(); } }                    // loop owns cv opacity (exit fade) while active; '1' here restores it on re-entry
-  else { cv.style.opacity='0'; if(window.__exitWipe) window.__exitWipe.hide(); }        // leaving How-it-works → hide the scene + retract the exit scrim
+  if(active){ cv.style.opacity='1'; if(!raf){ raf=true; loop(); } }
+  else { cv.style.opacity='0'; window.__pauseLiquid=false; if(glmHintEl) glmHintEl.classList.remove('show'); if(window.__exitWipe) window.__exitWipe.hide(); }   // leaving How-it-works → hand the live scan-field back, hide the scene + cue + retract the exit scrim
 }),{rootMargin:'0px'}).observe(processEl);
+
+// ===== TURNTABLE: horizontal drag spins the bottle around Y; vertical stays native scroll. Axis is locked on the first significant move so a vertical fling never spins it, and a horizontal spin never scrolls. Active only while the scene is on-screen. =====
+const ROT_SENS=0.008;   // radians per px (eyeball knob)
+let dragStartX=0, dragStartY=0, dragRot0=0, dragAxis=0;   // dragAxis: 0 undecided · 1 horizontal(rotate) · -1 vertical(scroll)
+addEventListener('touchstart', e=>{ if(!active || e.touches.length!==1) return; const t=e.touches[0]; dragStartX=t.clientX; dragStartY=t.clientY; dragRot0=userRotY; dragAxis=0; }, {passive:true});
+addEventListener('touchmove', e=>{ if(!active || dragAxis===-1 || e.touches.length!==1) return; const t=e.touches[0], dx=t.clientX-dragStartX, dy=t.clientY-dragStartY;
+  if(dragAxis===0){ if(Math.abs(dx)>8 || Math.abs(dy)>8) dragAxis = Math.abs(dx)>Math.abs(dy) ? 1 : -1; else return; }   // lock axis once the move is decisive
+  if(dragAxis===1){ e.preventDefault(); userRotY = dragRot0 + dx*ROT_SENS; }                                          // horizontal → spin the bottle, block the scroll
+}, {passive:false});
+addEventListener('touchend', ()=>{ dragAxis=0; }, {passive:true});
 }catch(e){ console.warn('mobile shinobu scene off:', e); } })();
 </script>
 </body>
