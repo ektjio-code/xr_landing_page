@@ -21,7 +21,7 @@
   #track{position:relative;width:100%;height:120vh;z-index:0;pointer-events:none} /* v3: short runway — ~0.2 screen resting hero, then the strips wipe reveals the site over the release runway. (was 700vh cinematic) */
   #release{display:none} /* v3: removed the old canvas-release runway — the body content now sits directly behind the strips scrim so Real vs Render prints up THROUGH the wipe (no empty settle-then-scroll) */
   #compare{border-top:none} /* first body section emerges from the void with no seam line */
-  @media (pointer:coarse){ #track{height:100vh} body{overflow-x:hidden} }   /* v3 mobile port: native vertical scroll; horizontal LOCKED (no sideways overflow) so 3D scenes get clean full width. */
+  @media (pointer:coarse){ #track{height:100vh} html,body{overflow-x:clip} }   /* v3 mobile port: native vertical scroll; horizontal contained with overflow-x:CLIP on the ROOT (not body-only hidden) — clip reliably contains transformed/off-screen descendants on iOS AND doesn't create a scroll container, so it won't break the sticky scene stage. */
   /* portrait-only gate (mobile): true orientation.lock() is unsupported on iOS + needs fullscreen on Android, so we block landscape instead */
   #rotateGate{display:none}
   @media (pointer:coarse) and (orientation:landscape){
@@ -164,6 +164,11 @@
   .steps>.step.reveal:nth-child(odd){transform:translateY(74px) rotate(-4deg) scale(.9)}
   .steps>.step.reveal:nth-child(even){transform:translateY(74px) rotate(4deg) scale(.9)}
   .reveal.in{opacity:1 !important;transform:none !important}
+  /* mobile: no horizontal fly-in — the ±90px X-translate (odd/even) pushed cards past the viewport → the horizontal-overflow bar + the lock flickering as they animate. Rise + scale only; no X, no rotate. */
+  @media (pointer:coarse){
+    .cards>.card.reveal:nth-child(odd),.cards>.card.reveal:nth-child(even){transform:translateY(52px) scale(.9)}
+    .steps>.step.reveal:nth-child(odd),.steps>.step.reveal:nth-child(even){transform:translateY(60px) scale(.92)}
+  }
 
   /* ===== v3 INTRO / LOADING GATE — blue screen; XRZENO decodes L→R as the real 3D-load bar ===== */
   #intro{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
@@ -2016,6 +2021,12 @@ new GLTFLoader().load('shinobu.glb',(gltf)=>{
   pointGeo.setAttribute('color',new THREE.BufferAttribute(colors,3));
   points=new THREE.Points(pointGeo, new THREE.PointsMaterial({ size:0.011, map:dotTex, vertexColors:true, transparent:true, opacity:0.9, depthWrite:false, depthTest:true, blending:THREE.AdditiveBlending, sizeAttenuation:true }));
   pivot.add(points);
+  // ===== PRE-WARM (fixes the first-materialization stutter): do the one-time shader compile + 16k-point buffer/texture upload NOW, during load, into the hidden (opacity-0) canvas — at BOTH key states — so the first real materialize is already warm. =====
+  try{
+    setForm(0); bloom.enabled=true; bloom.strength=0.85; composer.render();   // scattered + bloom → compiles the points material + bloom/composer passes, uploads the point buffer
+    setForm(1); composer.render();                                            // formed → compiles the bottle + fake-glass materials
+    setForm(0); lastFormF=-1;                                                 // reset to the scattered start (force a clean rebuild on the first real frame)
+  }catch(e){ console.warn('shinobu pre-warm skipped', e); }
 },undefined,(err)=>console.warn('shinobu.glb load failed', err));
 
 function easeInOut(t){ return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2; }
