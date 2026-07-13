@@ -1880,7 +1880,7 @@ if(IS_COARSE && window.DeviceMotionEvent){
       const jerk=Math.abs(a.x-lastA.x)+Math.abs(a.y-lastA.y)+Math.abs(a.z-lastA.z);
       if(jerk>16 && active){                                    // shake (sensitive — gentle shakes register) → spill standing + fling EVERY body every which way
         shakeAt=performance.now();
-        const kick=Math.min(jerk*8, 800);
+        const kick=Math.min(jerk*10, 1000);
         for(const g of glyphs){
           if(g.state==='idle') knock(g);                        // topple standing → now a body
           if(g.state==='fallen' && g.body){                     // fling all bodies (incl. just-toppled) in random directions
