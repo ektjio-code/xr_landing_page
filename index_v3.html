@@ -1548,6 +1548,15 @@ try{(function(){
   // pointer (damped) — the cursor reveals dots locally
   let mx=innerWidth/2, my=innerHeight/2, pmx=mx, pmy=my;
   addEventListener('pointermove', e=>{ mx=e.clientX; my=e.clientY; });
+  // MOBILE: device TILT drives the glow hotspot (no hover on touch). Rides on the Motion&Orientation permission the hero's shake already requests on touchend (iOS 13+); Android fires immediately. Baseline/sensitivity/signs are eyeball knobs.
+  if(matchMedia('(pointer:coarse)').matches && window.DeviceOrientationEvent){
+    addEventListener('deviceorientation', e=>{
+      if(e.gamma==null || e.beta==null) return;
+      const gx=Math.max(-1,Math.min(1, e.gamma/40));        // left-right tilt (deg) → -1..1
+      const gy=Math.max(-1,Math.min(1, (e.beta-45)/40));    // front-back tilt, baseline ~45deg hold → -1..1
+      mx=W*(0.5 + gx*0.6); my=H*(0.5 + gy*0.6);             // slide the reveal spot toward the tilt (pmx/pmy in frame() glide it there)
+    }, {passive:true});
+  }
 
   function frame(now){
     if(window.__pauseLiquid){ requestAnimationFrame(frame); return; }   // opt (mobile): paused while the fullscreen #glm scene fully occludes this layer — no fullscreen 2D repaint + blur re-composite competing with the WebGL render (the blurred layer stays cached; resumes the instant the exit wipe reveals the site)
