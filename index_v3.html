@@ -22,6 +22,12 @@
   #release{display:none} /* v3: removed the old canvas-release runway — the body content now sits directly behind the strips scrim so Real vs Render prints up THROUGH the wipe (no empty settle-then-scroll) */
   #compare{border-top:none} /* first body section emerges from the void with no seam line */
   @media (pointer:coarse){ #track{height:100vh} body{overflow-x:hidden} }   /* v3 mobile port: native vertical scroll; horizontal LOCKED (no sideways overflow) so 3D scenes get clean full width. */
+  /* portrait-only gate (mobile): true orientation.lock() is unsupported on iOS + needs fullscreen on Android, so we block landscape instead */
+  #rotateGate{display:none}
+  @media (pointer:coarse) and (orientation:landscape){
+    #rotateGate{display:flex;position:fixed;inset:0;z-index:999;background:#0a1633;color:#eaf1ff;align-items:center;justify-content:center;text-align:center;padding:8vw;
+      font-family:'Montserrat',system-ui,sans-serif;font-weight:600;font-size:clamp(15px,4.5vw,24px);letter-spacing:.06em;line-height:1.5}
+  }
   :root{ --ink:#f3ece1; --muted:#9a8c79; --accent:#e8a05c; }
   /* ===== DRAWER: the corner XRZENO is the site's menu / escape hatch (replaces the old static #brand; z-index 100, above everything). Cold navy panel, warm-orange actionable accents to match the site buttons. ===== */
   #drawerCtl{position:fixed;top:15px;left:18px;z-index:100;display:flex;align-items:center;gap:8px;background:none;border:0;cursor:pointer;color:#f0ece4;font-family:'Montserrat',system-ui,sans-serif;font-size:12px;letter-spacing:.26em;font-weight:700;padding:8px;transition:letter-spacing .25s}
@@ -243,6 +249,7 @@
 
 <canvas id="liquidBg" aria-hidden="true"></canvas>
 <div id="toppleCursor" aria-hidden="true"></div>
+<div id="rotateGate"><span>↻&ensp;Please rotate your device to portrait</span></div>
 <!-- ===== SITE BODY (concept skeleton) — living liquid backdrop; content flies in over it ===== -->
 <div id="siteBody">
 <section id="topple" aria-label="XRZENO — WebAR product visualization">
