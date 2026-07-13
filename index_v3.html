@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <script>
   /* Device split: MOBILE → the hero page; DESKTOP stays on this tokonoma scene. (?stay to override) */
   if(!/[?&]stay/i.test(location.search) && matchMedia('(pointer:coarse)').matches) location.replace('index.html');
@@ -1542,6 +1542,7 @@ try{(function(){
 <script>
 try{(function(){
   const fx=document.getElementById('fx'); if(!fx) return;
+  if(matchMedia('(pointer:coarse)').matches){ fx.style.display='none'; return; }   // mobile: real-bloom card frames are too heavy — skip them; cards keep their static box-shadow
   const fctx=fx.getContext('2d'), oc=document.createElement('canvas'), octx=oc.getContext('2d');
   let FW,FH,FDPR;
   function fxsize(){ FDPR=Math.min(devicePixelRatio||1,2); FW=innerWidth; FH=innerHeight;
@@ -1693,11 +1694,11 @@ function highlightSet(s){
 function buildGlyphs(){
   for(const g of glyphs){ scene.remove(g.mesh); g.mesh.geometry.dispose(); if(g.body) world.removeBody(g.body); }
   glyphs.length=0; lineYs=[];
-  const size=K.size, depth=size*0.2;
+  const size=Math.min(K.size, W*0.11), depth=size*0.2;   // responsive: shrink on narrow screens so no word overflows the frame
   const res=font.data.resolution, scale=size/res;
   const track=size*0.008;
   const advance = ch => ((font.data.glyphs[ch]||font.data.glyphs['?']).ha)*scale + track;
-  const lineGap=size*1.42, maxW=Math.min(1000,W*0.84), spaceW=advance(' ');
+  const lineGap=size*1.42, maxW=Math.min(1000,W*0.86), spaceW=advance(' ');
   const HL=highlightSet(SENTENCE);
   const words=SENTENCE.split(' ');
   const lines=[]; let cur2=[],curW=0;
@@ -1755,13 +1756,17 @@ addEventListener('pointerleave', ()=>{ curp.set(-1e4,-1e4); curVel.set(0,0); });
 // TOUCH (mobile): TAP a letter to topple it; a drag just scrolls (no capture → native scroll untouched)
 let tStart=null, tMoved=false;
 addEventListener('pointerdown', e=>{ if(e.pointerType!=='mouse'){ tStart={x:e.clientX,y:e.clientY}; tMoved=false; } });
-addEventListener('pointermove', e=>{ if(e.pointerType!=='mouse' && tStart && Math.hypot(e.clientX-tStart.x,e.clientY-tStart.y)>12) tMoved=true; }, {passive:true});
+addEventListener('pointermove', e=>{ if(e.pointerType!=='mouse' && tStart && Math.hypot(e.clientX-tStart.x,e.clientY-tStart.y)>16) tMoved=true; }, {passive:true});
 addEventListener('pointerup', e=>{
   if(e.pointerType==='mouse' || !tStart){ tStart=null; return; }
-  if(!tMoved && active && ready){                                // a tap (not a scroll) over a letter topples it
+  if(!tMoved && active && ready){                                // a tap (not a scroll) near a letter topples it
     const r=canvas.getBoundingClientRect();
-    const wx=(e.clientX-r.left)-W/2, wy=-((e.clientY-r.top)-H/2);
-    for(const g of glyphs){ if(g.state==='idle' && Math.abs(wx-g.mesh.position.x)<g.hw && Math.abs(wy-g.mesh.position.y)<g.hh){ knock(g); break; } }
+    const wx=(tStart.x-r.left)-W/2, wy=-((tStart.y-r.top)-H/2);  // use the DOWN point (their intent), padded hitbox, nearest letter
+    let best=null,bestD=1e9;
+    for(const g of glyphs){ if(g.state!=='idle') continue;
+      const dx=wx-g.mesh.position.x, dy=wy-g.mesh.position.y;
+      if(Math.abs(dx)<g.hw+16 && Math.abs(dy)<g.hh+16){ const d=dx*dx+dy*dy; if(d<bestD){ bestD=d; best=g; } } }
+    if(best) knock(best);
   }
   tStart=null;
 });
