@@ -187,6 +187,8 @@
   #toppleGl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:block}   /* absolute INSIDE #topple → the hero scrolls away with the page like a normal section (no fade) */
   #toppleCursor{position:fixed;left:0;top:0;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;border:1.5px solid rgba(30,64,255,.75);box-shadow:0 0 10px 1px rgba(30,64,255,.30);z-index:6;pointer-events:none;transform:translate(-200px,-200px);opacity:0;transition:opacity .3s}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  #glm{display:none}
+  @media (pointer:coarse){ #glm{display:block;position:fixed;inset:0;width:100vw;height:100vh;z-index:4;pointer-events:none;opacity:0;transition:opacity .3s} }   /* mobile Shinobu scene canvas (How-it-works) */
   #bleed2{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none;display:none}   /* v3: EXIT strips scrim — Method-A shader ABOVE #gl (z5>z4). Samples the live scene + eats it → reveals the site. #gl fades to 0 during the exit so eaten columns show the DOM below. */
   #fx{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none}   /* v3: emissive card-frame bloom — additive glow lines above #gl, drawn only where a card is hover-lit / magnetized (else fully transparent) */
   #coolVeil,#hint{display:none!important}   /* v3: #ar ("View in 3D") is un-hidden — it's the already-wired inspect pill, shown at the bottom of the fullscreen scene */
@@ -248,6 +250,7 @@
 <div id="toast"></div>
 
 <canvas id="liquidBg" aria-hidden="true"></canvas>
+<canvas id="glm" aria-hidden="true"></canvas><!-- v3 MOBILE How-it-works: art-directed Shinobu materialize (ported from old index.html), scroll-driven -->
 <div id="toppleCursor" aria-hidden="true"></div>
 <div id="rotateGate"><span>↻&ensp;Please rotate your device to portrait</span></div>
 <!-- ===== SITE BODY (concept skeleton) — living liquid backdrop; content flies in over it ===== -->
@@ -1909,6 +1912,125 @@ if(IS_COARSE && window.DeviceMotionEvent){
   } else enable();                                              // Android: no prompt needed
 }
 }catch(e){ console.warn('topple hero off:', e); }
+</script>
+
+<!-- ===== MOBILE How-it-works: art-directed Shinobu materialize (ported from old index.html), scroll-driven. STEP 1: scene + scroll-scrub materialize (fullscreen); card/expand/hold/scrim still TODO. ===== -->
+<script type="module">
+if(matchMedia('(pointer:coarse)').matches) (async()=>{ try{
+const THREE = await import('three');
+const [{GLTFLoader},{MeshSurfaceSampler},{EffectComposer},{RenderPass},{UnrealBloomPass},{OutputPass},{RoomEnvironment}] = await Promise.all([
+  import('three/addons/loaders/GLTFLoader.js'),
+  import('three/addons/math/MeshSurfaceSampler.js'),
+  import('three/addons/postprocessing/EffectComposer.js'),
+  import('three/addons/postprocessing/RenderPass.js'),
+  import('three/addons/postprocessing/UnrealBloomPass.js'),
+  import('three/addons/postprocessing/OutputPass.js'),
+  import('three/addons/environments/RoomEnvironment.js') ]);
+
+const cv=document.getElementById('glm'), processEl=document.getElementById('process');
+let W=innerWidth, H=innerHeight;
+const renderer=new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.setSize(W,H);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=0.95;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x16130f);
+const camera=new THREE.PerspectiveCamera(38, W/H, 0.01, 100);
+camera.position.set(0,-0.06,1.15);
+
+const KEY0=2.4, FILL0=0.5, RIM0=1.4, AMB0=1.2;
+const key=new THREE.DirectionalLight(0xfff0dd,KEY0); key.position.set(2,3,2); scene.add(key);
+const fill=new THREE.DirectionalLight(0xcfe0ff,FILL0); fill.position.set(-3,1,1); scene.add(fill);
+const rim=new THREE.DirectionalLight(0xffd9a8,RIM0); rim.position.set(0,1,-3); scene.add(rim);
+const amb=new THREE.AmbientLight(0x4a3f33,AMB0); scene.add(amb);
+
+const pmrem=new THREE.PMREMGenerator(renderer);
+scene.environment=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
+pmrem.dispose();
+
+const pivot=new THREE.Group(); scene.add(pivot);
+
+const composer=new EffectComposer(renderer);
+composer.renderTarget1.samples=0; composer.renderTarget2.samples=0;
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(W,H),0.85,0.45,0.2);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+function makeDotSprite(){ const s=64,c=document.createElement('canvas'); c.width=c.height=s;
+  const x=c.getContext('2d'), g=x.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  g.addColorStop(0,'rgba(255,255,255,1)'); g.addColorStop(.35,'rgba(255,255,255,.55)'); g.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=g; x.fillRect(0,0,s,s); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t; }
+const dotTex=makeDotSprite();
+
+let meshes=[], points=null, pointGeo=null, homePos=null, scatterPos=null;
+const COUNT=16000;
+
+new GLTFLoader().load('shinobu.glb',(gltf)=>{
+  const obj=gltf.scene; meshes=[]; obj.traverse(o=>{ if(o.isMesh) meshes.push(o); });
+  const box=new THREE.Box3().setFromObject(obj), size=box.getSize(new THREE.Vector3()), center=box.getCenter(new THREE.Vector3());
+  const s=0.62/Math.max(size.x,size.y,size.z);
+  obj.position.sub(center); obj.scale.setScalar(s);
+  const wrap=new THREE.Group(); wrap.add(obj); wrap.rotation.x=-Math.PI/2*0.15; pivot.add(wrap);
+  meshes.forEach(m=>{ const mat=m.material;
+    if(mat.transmission>0){ m.userData.isGlass=true; mat.transmission=0; mat.color.setHex(0x000000); mat.transparent=true; mat.opacity=0.12; mat.roughness=0.04; mat.metalness=0; mat.envMapIntensity=1.1; mat.depthWrite=false; mat.needsUpdate=true; }
+    else { if('envMapIntensity' in mat) mat.envMapIntensity=1.3; mat.transparent=true; mat.opacity=0; } });
+  scene.updateMatrixWorld(true);
+  homePos=new Float32Array(COUNT*3); scatterPos=new Float32Array(COUNT*3);
+  const colors=new Float32Array(COUNT*3), tmpP=new THREE.Vector3();
+  const vcount=meshes.map(m=>m.geometry.attributes.position.count), totalV=vcount.reduce((a,b)=>a+b,0)||1;
+  let idx=0;
+  meshes.forEach((m,mi)=>{ const n=Math.max(0, mi===meshes.length-1?COUNT-idx:Math.round(COUNT*vcount[mi]/totalV));
+    const sampler=new MeshSurfaceSampler(m).build();
+    for(let k=0;k<n&&idx<COUNT;k++,idx++){ sampler.sample(tmpP); tmpP.applyMatrix4(m.matrixWorld); pivot.worldToLocal(tmpP);
+      homePos[idx*3]=tmpP.x; homePos[idx*3+1]=tmpP.y; homePos[idx*3+2]=tmpP.z;
+      const dir=new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize(), r=0.7+Math.random()*1.1;
+      scatterPos[idx*3]=dir.x*r; scatterPos[idx*3+1]=dir.y*r; scatterPos[idx*3+2]=dir.z*r;
+      colors[idx*3]=0.92; colors[idx*3+1]=0.74; colors[idx*3+2]=0.52; } });
+  pointGeo=new THREE.BufferGeometry();
+  pointGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(scatterPos),3));
+  pointGeo.setAttribute('color',new THREE.BufferAttribute(colors,3));
+  points=new THREE.Points(pointGeo, new THREE.PointsMaterial({ size:0.011, map:dotTex, vertexColors:true, transparent:true, opacity:0.9, depthWrite:false, depthTest:true, blending:THREE.AdditiveBlending, sizeAttenuation:true }));
+  pivot.add(points);
+},undefined,(err)=>console.warn('shinobu.glb load failed', err));
+
+function easeInOut(t){ return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2; }
+let lastFormF=-1;
+function setForm(f){
+  if(!points||!pointGeo) return;
+  if(f!==lastFormF){ lastFormF=f;
+    const pos=pointGeo.attributes.position.array, e=easeInOut(Math.min(1,f/0.7));
+    for(let i=0;i<COUNT;i++){ const j=i*3;
+      pos[j]=scatterPos[j]+(homePos[j]-scatterPos[j])*e;
+      pos[j+1]=scatterPos[j+1]+(homePos[j+1]-scatterPos[j+1])*e;
+      pos[j+2]=scatterPos[j+2]+(homePos[j+2]-scatterPos[j+2])*e; }
+    pointGeo.attributes.position.needsUpdate=true; }
+  const meshIn=Math.max(0,Math.min(1,(f-0.55)/0.45));
+  for(const m of meshes){ if(m.userData.isGlass){ m.visible=meshIn>0; } else { m.material.opacity=meshIn; m.material.transparent=meshIn<1; m.visible=meshIn>0; } }
+  points.material.opacity=0.9*(1-meshIn); points.visible=meshIn<1;
+}
+
+function scrollProgress(){ const r=processEl.getBoundingClientRect(), sc=r.height-innerHeight; return sc>0?Math.min(Math.max(-r.top/sc,0),1):0; }
+
+let targetF=0, curF=0, active=false, raf=false;
+function loop(){
+  if(!active){ raf=false; return; }
+  targetF=Math.min(1, scrollProgress()/0.5);            // materialize over the first ~half of #process (step 1; zones tuned later)
+  curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
+  setForm(curF);
+  const formed=Math.max(0,Math.min(1,(curF-0.55)/0.45));
+  bloom.strength=0.85*(1-formed); bloom.enabled=formed<1;
+  const lit=1-0.6*formed; key.intensity=KEY0*lit; fill.intensity=FILL0*lit; rim.intensity=RIM0*lit; amb.intensity=AMB0*lit;
+  pivot.rotation.y = curF*0.6 + performance.now()*0.00006;   // form-rotation + gentle idle spin
+  composer.render();
+  requestAnimationFrame(loop);
+}
+addEventListener('resize',()=>{ W=innerWidth;H=innerHeight; renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix(); composer.setSize(W,H); });
+new IntersectionObserver(es=>es.forEach(e=>{ active=e.isIntersecting; cv.style.opacity=active?'1':'0'; if(active&&!raf){ raf=true; loop(); } }),{rootMargin:'0px'}).observe(processEl);
+}catch(e){ console.warn('mobile shinobu scene off:', e); } })();
 </script>
 </body>
 </html>
