@@ -1878,16 +1878,17 @@ if(IS_COARSE && window.DeviceMotionEvent){
     world.gravity.set(gx, -K.grav, 0);                          // gravity ALWAYS follows tilt → fallen letters keep following the phone
     if(lastA){
       const jerk=Math.abs(a.x-lastA.x)+Math.abs(a.y-lastA.y)+Math.abs(a.z-lastA.z);
-      if(jerk>26 && active){                                    // firm shake → spill standing letters + KICK the fallen ones so the pile stays lively
+      if(jerk>16 && active){                                    // shake (sensitive — gentle shakes register) → spill standing + fling EVERY body every which way
         shakeAt=performance.now();
-        const kick=Math.min(jerk*5, 460);
+        const kick=Math.min(jerk*8, 800);
         for(const g of glyphs){
-          if(g.state==='idle') knock(g);
-          else if(g.state==='fallen' && g.body){
+          if(g.state==='idle') knock(g);                        // topple standing → now a body
+          if(g.state==='fallen' && g.body){                     // fling all bodies (incl. just-toppled) in random directions
             g.body.wakeUp();
             g.body.velocity.x += (Math.random()-.5)*kick;
-            g.body.velocity.y += Math.random()*kick*0.8;
-            g.body.angularVelocity.set((Math.random()-.5)*12,(Math.random()-.5)*12,(Math.random()-.5)*12);
+            g.body.velocity.y += (Math.random()-.3)*kick;       // slight upward bias so they leap off the floor
+            g.body.velocity.z += (Math.random()-.5)*kick*0.6;
+            g.body.angularVelocity.set((Math.random()-.5)*18,(Math.random()-.5)*18,(Math.random()-.5)*18);
           }
         }
       }
