@@ -1837,7 +1837,8 @@ function frame(){
       g.mesh.position.copy(g.body.position); g.mesh.quaternion.copy(g.body.quaternion);
       const speed=g.body.velocity.length()+g.body.angularVelocity.length()*8;
       if(speed<25){ if(!g.landAt) g.landAt=t; } else g.landAt=0;
-      if((g.landAt && t-g.landAt>K.hold*1000) || (t-g.fellAt>K.hold*1000+2600)) standUp(g);
+      // stand up only once shaking has been calm ~1s (mobile); desktop shakeAt stays -1e9 so this is always true there
+      if(t-shakeAt>1000 && ((g.landAt && t-g.landAt>K.hold*1000) || (t-g.fellAt>K.hold*1000+2600))) standUp(g);
     } else if(g.state==='rising'){
       const r=g._r, u=Math.min((t-r.t0)/r.dur,1), e=easeInOut(u);
       g.mesh.position.lerpVectors(r.from,g.home,e);
@@ -1850,7 +1851,7 @@ function frame(){
   requestAnimationFrame(frame);
 }
 
-let ready=false, active=false, rafOn=false;
+let ready=false, active=false, rafOn=false, shakeAt=-1e9;   // shakeAt: last strong shake (mobile) — gates stand-up so letters stay down while shaking
 function maybeStart(){ if(ready && active && !rafOn){ rafOn=true; last=performance.now(); frame(); } }
 
 new FontLoader().load(FONT_URL, f=>{ font=f; placeCamera(); renderer.setSize(W,H,false); buildGlyphs(); ready=true; maybeStart(); });
@@ -1867,19 +1868,29 @@ new IntersectionObserver(es=>es.forEach(e=>{
   maybeStart();
 }), {rootMargin:'0px'}).observe(heroEl);
 
-// SHAKE-TO-TUMBLE (mobile) — shake to spill the letters; they fall toward whichever way the phone is tilted; ~1s of calm and they stand back up.
+// SHAKE-TO-TUMBLE (mobile) — shake spills the standing letters + jostles the fallen ones; gravity ALWAYS follows the tilt so they
+// keep sliding after they fall; they stand back up only once shaking has been calm ~1s (the shakeAt gate in the fallen branch).
 if(IS_COARSE && window.DeviceMotionEvent){
-  let lastA=null, lastShake=-1e9, steering=false;
+  let lastA=null;
   const onMotion = e=>{
     const a=e.accelerationIncludingGravity; if(!a || a.x==null) return;
-    const gx=THREE.MathUtils.clamp(-a.x*90, -1600, 1600);       // fall direction straight from gravity.x (level≈0, no calibration). Flip the leading sign if letters fall the wrong way.
+    const gx=THREE.MathUtils.clamp(-a.x*90, -1600, 1600);       // slide/fall direction from live gravity.x (level≈0, no calibration). Flip the leading sign if it goes the wrong way.
+    world.gravity.set(gx, -K.grav, 0);                          // gravity ALWAYS follows tilt → fallen letters keep following the phone
     if(lastA){
       const jerk=Math.abs(a.x-lastA.x)+Math.abs(a.y-lastA.y)+Math.abs(a.z-lastA.z);
-      if(jerk>26){                                              // firm shake → spill the standing letters + steer the slide
-        lastShake=performance.now(); steering=true;
-        world.gravity.set(gx,-K.grav,0);
-        if(active) for(const g of glyphs) if(g.state==='idle') knock(g);
-      } else if(steering){ world.gravity.set(gx,-K.grav,0); }   // keep steering while a shake is still recent
+      if(jerk>26 && active){                                    // firm shake → spill standing letters + KICK the fallen ones so the pile stays lively
+        shakeAt=performance.now();
+        const kick=Math.min(jerk*5, 460);
+        for(const g of glyphs){
+          if(g.state==='idle') knock(g);
+          else if(g.state==='fallen' && g.body){
+            g.body.wakeUp();
+            g.body.velocity.x += (Math.random()-.5)*kick;
+            g.body.velocity.y += Math.random()*kick*0.8;
+            g.body.angularVelocity.set((Math.random()-.5)*12,(Math.random()-.5)*12,(Math.random()-.5)*12);
+          }
+        }
+      }
     }
     lastA={x:a.x,y:a.y,z:a.z};
   };
@@ -1888,7 +1899,6 @@ if(IS_COARSE && window.DeviceMotionEvent){
     const ask = ()=>{ removeEventListener('pointerdown', ask); DeviceMotionEvent.requestPermission().then(s=>{ if(s==='granted') enable(); }).catch(()=>{}); };
     addEventListener('pointerdown', ask);
   } else enable();                                              // Android: no prompt needed
-  setInterval(()=>{ if(steering && performance.now()-lastShake>1000){ steering=false; world.gravity.set(0,-K.grav,0); } }, 200);   // ~1s calm → gravity back to straight down → letters stand up
 }
 }catch(e){ console.warn('topple hero off:', e); }
 </script>
