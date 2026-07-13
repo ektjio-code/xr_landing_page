@@ -1867,21 +1867,28 @@ new IntersectionObserver(es=>es.forEach(e=>{
   maybeStart();
 }), {rootMargin:'0px'}).observe(heroEl);
 
-// TILT-TO-TUMBLE (mobile) — device tilt tips gravity; fallen letters slide to the low side, a firm tilt spills the standing ones.
-if(IS_COARSE && window.DeviceOrientationEvent){
-  let neutral=null, tiltOn=false;
-  const onTilt = e=>{
-    if(e.gamma==null) return;
-    if(neutral==null) neutral=e.gamma;                          // calibrate: current left-right hold = level
-    const dg=THREE.MathUtils.clamp(e.gamma-neutral,-35,35);
-    world.gravity.set(dg/35*1500, -K.grav, 0);                  // tilt → horizontal gravity (fallen letters slide)
-    if(active && Math.abs(dg)>20){ for(const g of glyphs) if(g.state==='idle') knock(g); }   // firm tilt → spill the standing letters
+// SHAKE-TO-TUMBLE (mobile) — shake to spill the letters; they fall toward whichever way the phone is tilted; ~1s of calm and they stand back up.
+if(IS_COARSE && window.DeviceMotionEvent){
+  let lastA=null, lastShake=-1e9, steering=false;
+  const onMotion = e=>{
+    const a=e.accelerationIncludingGravity; if(!a || a.x==null) return;
+    const gx=THREE.MathUtils.clamp(-a.x*90, -1600, 1600);       // fall direction straight from gravity.x (level≈0, no calibration). Flip the leading sign if letters fall the wrong way.
+    if(lastA){
+      const jerk=Math.abs(a.x-lastA.x)+Math.abs(a.y-lastA.y)+Math.abs(a.z-lastA.z);
+      if(jerk>26){                                              // firm shake → spill the standing letters + steer the slide
+        lastShake=performance.now(); steering=true;
+        world.gravity.set(gx,-K.grav,0);
+        if(active) for(const g of glyphs) if(g.state==='idle') knock(g);
+      } else if(steering){ world.gravity.set(gx,-K.grav,0); }   // keep steering while a shake is still recent
+    }
+    lastA={x:a.x,y:a.y,z:a.z};
   };
-  const enable = ()=>{ if(!tiltOn){ tiltOn=true; addEventListener('deviceorientation', onTilt); } };
-  if(typeof DeviceOrientationEvent.requestPermission==='function'){   // iOS: unlock on the first tap (required user gesture)
-    const ask = ()=>{ removeEventListener('pointerdown', ask); DeviceOrientationEvent.requestPermission().then(s=>{ if(s==='granted') enable(); }).catch(()=>{}); };
+  const enable = ()=>addEventListener('devicemotion', onMotion);
+  if(typeof DeviceMotionEvent.requestPermission==='function'){  // iOS: unlock on the first tap (required user gesture)
+    const ask = ()=>{ removeEventListener('pointerdown', ask); DeviceMotionEvent.requestPermission().then(s=>{ if(s==='granted') enable(); }).catch(()=>{}); };
     addEventListener('pointerdown', ask);
-  } else { enable(); }                                          // Android: no prompt needed
+  } else enable();                                              // Android: no prompt needed
+  setInterval(()=>{ if(steering && performance.now()-lastShake>1000){ steering=false; world.gravity.set(0,-K.grav,0); } }, 200);   // ~1s calm → gravity back to straight down → letters stand up
 }
 }catch(e){ console.warn('topple hero off:', e); }
 </script>
