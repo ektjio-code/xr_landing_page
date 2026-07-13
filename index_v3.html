@@ -1677,9 +1677,12 @@ function buildFloors(){
   for(const b of floors) world.removeBody(b);
   floors=[]; if(!lineYs.length) return;
   const fy = Math.min(...lineYs) - (IS_COARSE ? 90 : K.drop);   // one floor; mobile raises it (smaller drop) so letters don't tumble off-screen
-  const b = new CANNON.Body({ mass:0 }); b.addShape(new CANNON.Plane());
-  b.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
-  b.position.set(0,fy,0); world.addBody(b); floors.push(b);
+  const wall=(pos,ax,ay,az,ang)=>{ const b=new CANNON.Body({mass:0}); b.addShape(new CANNON.Plane()); b.quaternion.setFromAxisAngle(new CANNON.Vec3(ax,ay,az),ang); b.position.copy(pos); world.addBody(b); floors.push(b); };
+  wall(new CANNON.Vec3(0,fy,0), 1,0,0, -Math.PI/2);            // floor (normal +Y)
+  if(IS_COARSE){                                                // side walls keep letters on-screen when tilt slides them
+    wall(new CANNON.Vec3(-W/2,0,0), 0,1,0,  Math.PI/2);        // left wall (normal +X)
+    wall(new CANNON.Vec3( W/2,0,0), 0,1,0, -Math.PI/2);        // right wall (normal -X)
+  }
 }
 
 const baseMat = new THREE.MeshStandardMaterial({ color:INK, roughness:.42, metalness:.05 });
@@ -1863,6 +1866,23 @@ new IntersectionObserver(es=>es.forEach(e=>{
   cursorEl.style.opacity = active ? '1' : '0';
   maybeStart();
 }), {rootMargin:'0px'}).observe(heroEl);
+
+// TILT-TO-TUMBLE (mobile) — device tilt tips gravity; fallen letters slide to the low side, a firm tilt spills the standing ones.
+if(IS_COARSE && window.DeviceOrientationEvent){
+  let neutral=null, tiltOn=false;
+  const onTilt = e=>{
+    if(e.gamma==null) return;
+    if(neutral==null) neutral=e.gamma;                          // calibrate: current left-right hold = level
+    const dg=THREE.MathUtils.clamp(e.gamma-neutral,-35,35);
+    world.gravity.set(dg/35*1500, -K.grav, 0);                  // tilt → horizontal gravity (fallen letters slide)
+    if(active && Math.abs(dg)>20){ for(const g of glyphs) if(g.state==='idle') knock(g); }   // firm tilt → spill the standing letters
+  };
+  const enable = ()=>{ if(!tiltOn){ tiltOn=true; addEventListener('deviceorientation', onTilt); } };
+  if(typeof DeviceOrientationEvent.requestPermission==='function'){   // iOS: unlock on the first tap (required user gesture)
+    const ask = ()=>{ removeEventListener('pointerdown', ask); DeviceOrientationEvent.requestPermission().then(s=>{ if(s==='granted') enable(); }).catch(()=>{}); };
+    addEventListener('pointerdown', ask);
+  } else { enable(); }                                          // Android: no prompt needed
+}
 }catch(e){ console.warn('topple hero off:', e); }
 </script>
 </body>
