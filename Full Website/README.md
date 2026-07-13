@@ -27,8 +27,9 @@ each session.
 ## Files & git
 - Repo: **github.com/ektjio-code/xr_landing_page** (`origin`/`main`). Pages (real AR + phone testing):
   `ektjio-code.github.io/xr_landing_page/` — phones can't reach localhost, so **push before phone testing.**
-- **Truth files (repo root):** **`index_v3.html`** = ACTIVE desktop · `index_v2.html` = desktop fallback ·
-  `index.html` = mobile · `strings.js` = EN+ID copy.
+- **Truth files (repo root):** **`index_v3.html`** = ACTIVE, single responsive (desktop + mobile) · `index_v2.html`
+  = desktop fallback · `index.html` = LEGACY mobile (superseded, pending retirement — flip the line-8 redirect) ·
+  `strings.js` = EN+ID copy.
 - Helpers at root (committed): `squiggle-scroll.html` / `squiggle-demo.html` (squiggle prototypes) +
   `xrzeno-bleed-transition-demo-v2.html` (Print Pass reference). `Backup/` is gitignored (local snapshots).
 - `.git` writes intermittently fail (OneDrive/AV lock) — e.g. `update_ref failed for refs/remotes/...`, or
@@ -71,7 +72,7 @@ Flow (native scroll everywhere EXCEPT How-it-works, which CAPTURES the wheel to 
 - **The scroll-lock is GONE in v3** (Ed's call). No `enterBodyLock`/`exitBodyLock`, no window wheel listener,
   no `bodyP` fade, no fixed `#siteBody` overlay. The 3D render loop runs ONLY while `#process` is on-screen
   (`sceneActive` via IntersectionObserver — replaced the old `v3Idle`), and self-pauses otherwise.
-- ⚠️ **Mobile NOT ported** — v3 is desktop-only so far.
+- **Mobile: PORTED (2026-07-13)** — v3 is now the single responsive file; see the "Mobile v3" section below.
 
 ### "How it works" scene (`index_v3.html` `#process`, updated 2026-07-11) — the tokonoma re-homed
 The shinobu tokonoma cinematic (from v2) now lives in the **`#process` section** as a Lusion-astronaut-style
@@ -130,6 +131,45 @@ shadows on `.card` / `.card.featured .fwrap` / `.cmp` so nothing sits flat. Sand
 frame directions: reticle · tilt · sweep · bevel · sheen · emissive). Featured card keeps its depth focus-pull
 INSIDE the glowing frame. Cards 2 & 3 are still `<model-viewer>` placeholders (pending real GLB/USDZ).
 
+### Mobile v3 — the responsive port (`index_v3.html`, 2026-07-13) — v3 IS the mobile experience now
+Mobile-only changes are guarded by `IS_COARSE` / `@media (pointer:coarse)` / touch props so desktop can't
+regress. **Testing:** phone → `ektjio-code.github.io/xr_landing_page/index_v3.html?stay` (HTTPS is REQUIRED for
+DeviceMotion/Orientation — shake + tilt), or `python -m http.server 8000` on a LAN IP + `?stay` for everything
+EXCEPT shake/tilt. `?stay` is REQUIRED everywhere — line 8 redirects phones to `index.html` without it.
+- **Hero = topple headline.** Touch = cursor (swept toppling); **shake-to-tumble** via DeviceMotion (gravity
+  follows tilt). iOS 13+ has NO global Motion setting — it's a per-site `requestPermission()` prompt fired on
+  **`touchend`** (pointerdown was unreliable), result toasted (granted / blocked / unavailable) via `#toast`
+  directly (desktop `showToast` is inside the `!isMobile` wrap). iOS CACHES a denial → clear Safari website data
+  to re-ask. Portrait-only gate (`#rotateGate`); zoom disabled; horizontal contained via **`overflow-x:CLIP` on
+  the root** (not body `hidden` — clip contains transformed descendants on iOS AND doesn't break sticky).
+- **How-it-works = the Shinobu materialize** (NOT the desktop tokonoma). The OLD `index.html` scene, ported
+  verbatim into a mobile-only `#glm` module (dynamic imports, three r0.169, RoomEnvironment IBL, 16k additive
+  dots, fake-glass, UnrealBloom). **The desktop `#gl` tokonoma is fully KILLED on mobile** — its whole scene body
+  is wrapped in `if(!isMobile){…}` (no renderer/PMREM/RT/composer created); only the intro gate + `window.__nav`
+  run. ⚠️ The `#intro` fade-on-scroll listener lived in that wrap — re-added to the mobile branch or scroll freezes.
+  Timeline zones on `#process` (440vh, pure **SCROLL-SCRUB**): windowed card 0–.06 · card opens · materialize
+  .14–.44 · hold .44–.67 · EXIT wipe .67–1.
+  - **card→expand:** scene framed in `#sceneWindow` (mobile 74vw×50vh), clip-path tracks the card rect,
+    TIME-tween open (`winExpand`); ember compressed (`points.scale .12`) while windowed.
+  - **exit→site:** the shared `#bleed2` scrim samples `#glm` (glCanvas = `glm` on coarse / `gl` on desktop) and
+    eats it → FAQ (pinned behind via `#faqReveal`). `window.__exitWipe.frame(exitP)` right after render.
+  - **turntable:** horizontal drag spins the bottle (Y only, `userRotY`, `ROT_SENS .008`); vertical stays native
+    scroll (axis locked on first decisive move).
+  - **"Scroll to continue ↓" cue** (`#glmHint`): on while playing, off the instant the exit starts.
+  - **PRE-WARM:** hidden warm frames (scattered+bloom, formed) after the GLB loads fix the first-materialize
+    shader-compile/upload stutter.
+  - ⚠️ **Autoplay + scroll-reverse was BUILT then SCRAPPED** (Ed: wouldn't reverse, too much hassle). Leave it
+    scroll-scrubbed. Don't re-try (also in Dead ends).
+- **Tilt-reactive background:** the `#liquidBg` scan-field glow hotspot follows **device tilt**
+  (`deviceorientation` beta/gamma) on mobile — no hover on touch, so tilt replaces the cursor reveal. Rides the
+  same Motion&Orientation grant the shake requests.
+- **PERF LESSON (big):** the mobile jank was NEVER the scene (the old index runs a near-identical scene
+  smoothly). It was `#liquidBg`'s `filter:blur(5px)` on a FIXED fullscreen canvas — the compositor re-blurs it
+  every scroll frame across the whole page. Fix: `@media(coarse){#liquidBg{filter:none}}` + pause its repaint
+  while `#glm` occludes it (`window.__pauseLiquid`). The scene is kept rendering EXACTLY like the smooth old
+  index (composer always on, `antialias:true`) — the composer-bypass/antialias micro-opts were reverted. Emissive
+  card frames (`#fx`) and the autoplay-scroll wheel-capture stay desktop-only.
+
 ### v2 + mobile (prior, still valid — scroll-lock still LIVES here)
 - `index_v2.html` (three r0.169): hero cinematic (materialize → journey rail → clay→final PBR → pinned
   beats SCAN/REBUILD/DELIVER → cold-night finale relight → XRZENO wordmark) → scroll-lock canvas-release
@@ -146,8 +186,9 @@ INSIDE the glowing frame. Cards 2 & 3 are still `<model-viewer>` placeholders (p
 - ✅ Done 2026-07-11: **scan-field bg** (replaced squiggle) · **Method-A exit wipe** + **FAQ reveal-in-place**
   (replaced the CSS-mask exit + `#processResume`) · **emissive card frames + shadows** (replaced a sheen
   attempt) · scene card always-opaque · DELIVER load-flash fixed · **autoplay-scroll on How-it-works**.
-1. **Port v3 to MOBILE** (`index.html` still on the old tap model). Apply the "does this port cheaply?" check.
-   The whole How-it-works scene + autoplay-scroll + emissive frames are desktop-only so far.
+1. ✅ **Ported v3 to MOBILE (2026-07-13)** — full responsive port; see "Mobile v3" above (Shinobu How-it-works,
+   turntable, tilt bg, shake, jank/overflow fixes). REMAINING: flip the line-8 device redirect → retire
+   `index.html`; featured-card `.fcard` depth-canvas → plain `<img>` on mobile (Ed OK'd, not built).
 2. **Real assets (Ed inputs):** portfolio GLB/USDZ for cards 2 & 3 (card 1 = bottle); the real photo+render
    pair for the compare slider (SAME angle/framing or the trick dies — currently placeholder gradients);
    real social handles for the 5 drawer icons (`instagram.com/xrzeno` etc. are placeholders).
@@ -253,4 +294,7 @@ D toggle DOF, R reset cam, `[` `]` exposure, E cycle env, B toggle HDRI bg.
 **Dead ends — do NOT reopen:** real transmission on the solid bottle · half-res bloom (flickery) ·
 composer↔direct render switch (stutter) · reflection probe on the lacquer tray (washed it pale) · the
 softbox/clearcoat/point-light/normal-flip glass chase · the wheel-driven auto-scroll (velocity backlog) ·
-a flavor-text scrim (text-shadow won) · the raster JPEG logo ("tacky") · SCAN wireframe state ("too jarring").
+a flavor-text scrim (text-shadow won) · the raster JPEG logo ("tacky") · SCAN wireframe state ("too jarring") ·
+**mobile How-it-works autoplay + scroll-reverse** (built 2026-07-13, wouldn't reverse cleanly → Ed scrapped it,
+leave the mobile scene scroll-scrubbed) · **JS smooth-scroll on mobile touch** (Lenis-style — fights native
+momentum, feels laggier; the "jumpy" was really the `#liquidBg` blur compositing, now fixed).
