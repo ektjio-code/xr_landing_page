@@ -178,6 +178,11 @@
   /* v3: lose the tokonoma hero — the scene still loads/compiles (drives the bar + preloads for How-it-works), just isn't shown */
   body{background:#0a1633}
   #gl{opacity:0;pointer-events:none;z-index:4}   /* v3: raised above the body — the tokonoma scene shows OVER the site during How-it-works; opacity driven by the #process section */
+  /* ===== TOPPLE HERO (v3) — 3D Montserrat headline on a TRANSPARENT canvas over the scan-field. Runs only while the hero is on-screen (gated like #process). ===== */
+  #topple{position:relative;min-height:100vh;cursor:none}
+  #toppleGl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:block}   /* absolute INSIDE #topple → the hero scrolls away with the page like a normal section (no fade) */
+  #toppleCursor{position:fixed;left:0;top:0;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;border:1.5px solid rgba(30,64,255,.75);box-shadow:0 0 10px 1px rgba(30,64,255,.30);z-index:6;pointer-events:none;transform:translate(-200px,-200px);opacity:0;transition:opacity .3s}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   #bleed2{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none;display:none}   /* v3: EXIT strips scrim — Method-A shader ABOVE #gl (z5>z4). Samples the live scene + eats it → reveals the site. #gl fades to 0 during the exit so eaten columns show the DOM below. */
   #fx{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none}   /* v3: emissive card-frame bloom — additive glow lines above #gl, drawn only where a card is hover-lit / magnetized (else fully transparent) */
   #coolVeil,#hint{display:none!important}   /* v3: #ar ("View in 3D") is un-hidden — it's the already-wired inspect pill, shown at the bottom of the fullscreen scene */
@@ -239,8 +244,13 @@
 <div id="toast"></div>
 
 <canvas id="liquidBg" aria-hidden="true"></canvas>
+<div id="toppleCursor" aria-hidden="true"></div>
 <!-- ===== SITE BODY (concept skeleton) — living liquid backdrop; content flies in over it ===== -->
 <div id="siteBody">
+<section id="topple" aria-label="XRZENO — WebAR product visualization">
+  <canvas id="toppleGl" aria-hidden="true"></canvas><!-- v3 TOPPLE HERO: transparent 3D headline — absolute INSIDE the hero so it scrolls away with the page -->
+  <h1 class="sr-only">We create 3D visual and interactive experiences that put your products in customers' hands</h1>
+</section>
 <section class="sect" id="compare">
   <div class="wrap">
     <div class="eyebrow" data-i18n="compare.eyebrow">Real vs Render</div>
@@ -332,7 +342,8 @@
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+  "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
 }}
 </script>
 <script type="module">
@@ -1621,6 +1632,193 @@ try{(function(){
   }
   requestAnimationFrame(loop);
 })();}catch(e){ console.warn('autoplay scroll off:',e); }
+</script>
+
+<!-- ===== TOPPLE HERO — 3D Montserrat headline; cursor topples the letters (cannon-es), neighbours shove + spring. Transparent over the scan-field. Scene runs ONLY while #topple is on-screen (paused + faded otherwise, like the tokonoma #process scene). ===== -->
+<script type="module">
+import * as THREE from 'three';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import * as CANNON from 'cannon-es';
+try{
+const FONT_URL = 'montserrat_semibold.typeface.json';
+const SENTENCE = "We create 3D visual and interactive eXpeRiences that put your products in customers' hands";
+const K = { grav:1400, drop:200, hold:1, knock:1, rest:.2, shr:110, shd:34, spr:150, size:56 };
+const INK=0xeaf1ff, ACC=0x1e40ff;   // site palette (colour tuning deferred)
+
+const canvas = document.getElementById('toppleGl');
+const cursorEl = document.getElementById('toppleCursor');
+const heroEl = document.getElementById('topple');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0x000000, 0);                 // transparent → the scan-field shows through
+const scene = new THREE.Scene();
+
+let W=innerWidth, H=innerHeight;
+const FOV=42;
+const camera = new THREE.PerspectiveCamera(FOV, W/H, 1, 6000);
+const camDist = ()=> (H/2)/Math.tan(THREE.MathUtils.degToRad(FOV)/2);
+function placeCamera(){ camera.position.set(0,0,camDist()); camera.lookAt(0,0,0); camera.aspect=W/H; camera.updateProjectionMatrix(); }
+
+scene.add(new THREE.AmbientLight(0xffffff,.72));
+const kl = new THREE.DirectionalLight(0xffffff,1.15); kl.position.set(-200,320,500); scene.add(kl);
+const rl = new THREE.DirectionalLight(0x9db0ff,.5); rl.position.set(260,-120,240); scene.add(rl);
+
+const sx2w = x => x - W/2;
+const sy2w = y => -(y - H/2);
+
+const world = new CANNON.World({ gravity:new CANNON.Vec3(0,-K.grav,0) });
+world.allowSleep = true;
+world.defaultContactMaterial.restitution = K.rest;
+world.defaultContactMaterial.friction = .55;
+let floors=[], lineYs=[];
+function buildFloors(){
+  for(const b of floors) world.removeBody(b);
+  floors=[]; if(!lineYs.length) return;
+  const fy = Math.min(...lineYs) - K.drop;                 // one floor, just under the lowest line
+  const b = new CANNON.Body({ mass:0 }); b.addShape(new CANNON.Plane());
+  b.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
+  b.position.set(0,fy,0); world.addBody(b); floors.push(b);
+}
+
+const baseMat = new THREE.MeshStandardMaterial({ color:INK, roughness:.42, metalness:.05 });
+const accMat  = new THREE.MeshStandardMaterial({ color:ACC, roughness:.35, metalness:.08 });
+const glyphs = [];
+let font = null;
+function highlightSet(s){
+  const set=new Set(); const i=s.indexOf('3D'); if(i>=0){set.add(i);set.add(i+1);}
+  for(let j=1;j<s.length;j++){ if(/[A-Z]/.test(s[j])&&/[a-z]/.test(s[j-1])) set.add(j); }
+  return set;
+}
+function buildGlyphs(){
+  for(const g of glyphs){ scene.remove(g.mesh); g.mesh.geometry.dispose(); if(g.body) world.removeBody(g.body); }
+  glyphs.length=0; lineYs=[];
+  const size=K.size, depth=size*0.2;
+  const res=font.data.resolution, scale=size/res;
+  const track=size*0.008;
+  const advance = ch => ((font.data.glyphs[ch]||font.data.glyphs['?']).ha)*scale + track;
+  const lineGap=size*1.42, maxW=Math.min(1000,W*0.84), spaceW=advance(' ');
+  const HL=highlightSet(SENTENCE);
+  const words=SENTENCE.split(' ');
+  const lines=[]; let cur2=[],curW=0;
+  const wordW = w => [...w].reduce((a,c)=>a+advance(c),0);
+  for(const w of words){
+    const ww=wordW(w);
+    if(cur2.length && curW+spaceW+ww>maxW){ lines.push({words:cur2,w:curW}); cur2=[]; curW=0; }
+    if(cur2.length) curW+=spaceW;
+    cur2.push(w); curW+=ww;
+  }
+  if(cur2.length) lines.push({words:cur2,w:curW});
+  const blockH=(lines.length-1)*lineGap;
+  const topY=blockH/2 + H*0.05;
+  let ci=0;
+  lines.forEach((ln,li)=>{
+    let x=-ln.w/2; const y=topY-li*lineGap; lineYs.push(y);
+    ln.words.forEach((w,wi)=>{
+      for(const ch of w){
+        if(ch!==' '){
+          const geo=new TextGeometry(ch,{font,size,depth,curveSegments:5,
+            bevelEnabled:true,bevelThickness:size*0.02,bevelSize:size*0.015,bevelSegments:2});
+          geo.computeBoundingBox(); const bb=geo.boundingBox;
+          const hw=(bb.max.x-bb.min.x)/2, hh=(bb.max.y-bb.min.y)/2, hd=(bb.max.z-bb.min.z)/2;
+          geo.translate(-(bb.max.x+bb.min.x)/2,-(bb.max.y+bb.min.y)/2,-(bb.max.z+bb.min.z)/2);
+          const mesh=new THREE.Mesh(geo,(HL.has(ci)?accMat:baseMat).clone());
+          const home=new THREE.Vector3(x+hw, y+(bb.max.y+bb.min.y)/2, 0);   // LEFT-align ink to the pen
+          mesh.position.copy(home); scene.add(mesh);
+          glyphs.push({ ch, mesh, home, hw, hh, hd:Math.max(hd,size*0.06), lineY:y,
+            state:'idle', off:new THREE.Vector2(), voff:new THREE.Vector2(), wasIn:false,
+            body:null, landAt:0, fellAt:0 });
+        }
+        x+=advance(ch); ci++;
+      }
+      if(wi<ln.words.length-1){ x+=spaceW; ci++; }
+    });
+  });
+  buildFloors();
+}
+
+let curp=new THREE.Vector2(-1e4,-1e4), curVel=new THREE.Vector2(), haveCur=false, lastMove=0, cx=-200, cy=-200;
+addEventListener('pointermove', e=>{
+  cx=e.clientX; cy=e.clientY;
+  cursorEl.style.transform=`translate(${cx}px,${cy}px)`;
+  const r=canvas.getBoundingClientRect();                        // canvas scrolls with the page → map pointer via its live rect
+  const p=new THREE.Vector2((e.clientX-r.left)-W/2, -((e.clientY-r.top)-H/2));
+  const t=performance.now();
+  if(haveCur){ const dt=Math.max((t-lastMove)/1000,1/120);
+    curVel.set(THREE.MathUtils.clamp((p.x-curp.x)/dt,-2000,2000), THREE.MathUtils.clamp((p.y-curp.y)/dt,-2000,2000)); }
+  curp.copy(p); lastMove=t; haveCur=true;
+});
+addEventListener('pointerleave', ()=>{ curp.set(-1e4,-1e4); curVel.set(0,0); });
+
+function knock(g){
+  const p=g.mesh.position;
+  const body=new CANNON.Body({ mass:1, position:new CANNON.Vec3(p.x,p.y,p.z),
+    shape:new CANNON.Box(new CANNON.Vec3(g.hw,g.hh,g.hd)), linearDamping:.1, angularDamping:.25 });
+  body.quaternion.copy(g.mesh.quaternion);
+  const kv=K.knock, vx=THREE.MathUtils.clamp(curVel.x,-1400,1400);
+  body.velocity.set(vx*0.35*kv, -110*kv + Math.min(0,curVel.y)*0.15, (Math.random()-.5)*60);
+  body.angularVelocity.set((Math.random()-.5)*4*kv,(Math.random()-.5)*3,(-vx*0.006 + (Math.random()-.5)*3)*kv);
+  world.addBody(body); g.body=body; g.state='fallen'; g.landAt=0; g.fellAt=performance.now();
+  g.off.set(0,0); g.voff.set(0,0);
+}
+function standUp(g){
+  if(g.body){ world.removeBody(g.body); g.body=null; }
+  g.state='rising';
+  g._r={ from:g.mesh.position.clone(), q0:g.mesh.quaternion.clone(), t0:performance.now(), dur:520 };
+}
+
+let last=performance.now();
+const easeInOut = u => u<.5 ? 2*u*u : 1-Math.pow(-2*u+2,2)/2;
+function frame(){
+  if(!active || !ready){ rafOn=false; return; }
+  const t=performance.now(), dt=Math.min((t-last)/1000,1/30); last=t;
+  const moving = (t-lastMove) < 120;
+  for(const g of glyphs){
+    if(g.state==='idle'){
+      const inside = moving && Math.abs(curp.x-g.mesh.position.x)<g.hw && Math.abs(curp.y-g.mesh.position.y)<g.hh;
+      if(inside && !g.wasIn){ g.wasIn=true; knock(g); continue; }
+      g.wasIn=inside;
+      let tx=0,ty=0;
+      const dx=g.home.x-curp.x, dy=g.home.y-curp.y, d=Math.hypot(dx,dy);
+      if(moving && d<K.shr && d>1e-3){ const f=1-d/K.shr; tx=dx/d*K.shd*f; ty=dy/d*K.shd*f; }
+      const ax=K.spr*(tx-g.off.x)-2*Math.sqrt(K.spr)*g.voff.x;
+      const ay=K.spr*(ty-g.off.y)-2*Math.sqrt(K.spr)*g.voff.y;
+      g.voff.x+=ax*dt; g.voff.y+=ay*dt; g.off.x+=g.voff.x*dt; g.off.y+=g.voff.y*dt;
+      g.mesh.position.set(g.home.x+g.off.x, g.home.y+g.off.y, 0);
+    } else if(g.state==='fallen'){
+      g.mesh.position.copy(g.body.position); g.mesh.quaternion.copy(g.body.quaternion);
+      const speed=g.body.velocity.length()+g.body.angularVelocity.length()*8;
+      if(speed<25){ if(!g.landAt) g.landAt=t; } else g.landAt=0;
+      if((g.landAt && t-g.landAt>K.hold*1000) || (t-g.fellAt>K.hold*1000+2600)) standUp(g);
+    } else if(g.state==='rising'){
+      const r=g._r, u=Math.min((t-r.t0)/r.dur,1), e=easeInOut(u);
+      g.mesh.position.lerpVectors(r.from,g.home,e);
+      g.mesh.quaternion.slerpQuaternions(r.q0,new THREE.Quaternion(),e);
+      if(u>=1){ g.mesh.position.copy(g.home); g.mesh.quaternion.identity(); g.state='idle'; g.wasIn=false; g.off.set(0,0); g.voff.set(0,0); }
+    }
+  }
+  world.step(1/60, dt, 4);
+  renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+
+let ready=false, active=false, rafOn=false;
+function maybeStart(){ if(ready && active && !rafOn){ rafOn=true; last=performance.now(); frame(); } }
+
+new FontLoader().load(FONT_URL, f=>{ font=f; placeCamera(); renderer.setSize(W,H,false); buildGlyphs(); ready=true; maybeStart(); });
+
+let rz; addEventListener('resize', ()=>{ clearTimeout(rz); rz=setTimeout(()=>{
+  W=innerWidth; H=innerHeight; renderer.setSize(W,H,false); placeCamera();
+  if(font && glyphs.every(g=>g.state==='idle')) buildGlyphs();
+},160); });
+
+// gate: render + show only while the hero is on-screen (never runs at the same time as the tokonoma scene)
+new IntersectionObserver(es=>es.forEach(e=>{
+  active = e.isIntersecting;                    // gate the RAF for perf — NO opacity fade; the canvas scrolls away with the page
+  cursorEl.style.opacity = active ? '1' : '0';
+  maybeStart();
+}), {rootMargin:'0px'}).observe(heroEl);
+}catch(e){ console.warn('topple hero off:', e); }
 </script>
 </body>
 </html>

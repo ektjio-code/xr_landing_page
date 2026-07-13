@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>topple-lab-3d — walk the cursor through the headline, knock letters over</title>
+<!--
+  TOPPLE LAB (3D) — the pivot from the vacuum idea.
+  The headline floats in place. An invisible floor sits just under each line.
+  - Cursor passes THROUGH a glyph  -> that glyph falls, lies on the floor ~1s, then stands back up.
+  - Glyphs NEAR the cursor (not touched) -> shove away, then spring back to home. They do NOT fall.
+
+  FONT: Montserrat SemiBold, converted from the OFL TTF to a three typeface.json (montserrat_semibold.typeface.json).
+  To change weight, reconvert a different Montserrat static TTF the same way and repoint FONT_URL.
+-->
+<style>
+  :root{ --ink:#14141a; --accent:#1e40ff; --paper:#ffffff; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--paper);
+    font-family:"Montserrat",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    color:var(--ink); overflow:hidden; cursor:none;
+  }
+  #gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+  #cursor{
+    position:fixed;left:0;top:0;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;
+    border:1.5px solid rgba(30,64,255,.75); box-shadow:0 0 10px 1px rgba(30,64,255,.30);
+    z-index:20;pointer-events:none;transform:translate(-200px,-200px);
+  }
+
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="cursor"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+  "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import * as CANNON from 'cannon-es';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const FONT_URL = 'montserrat_semibold.typeface.json';   // Montserrat SemiBold (OFL), converted from TTF
+const SENTENCE = "We create 3D visual and interactive eXpeRiences that put your products in customers' hands";
+
+const K = { grav:1400, drop:200, hold:1, knock:1, rest:.2, shr:110, shd:34, spr:150, size:56, haze:20, floor:false };
+
+// ---- three ----
+const canvas = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0x000000, 0);
+const scene = new THREE.Scene();
+
+let W=innerWidth, H=innerHeight;
+const FOV=42;
+const camera = new THREE.PerspectiveCamera(FOV, W/H, 1, 6000);
+const camDist = ()=> (H/2)/Math.tan(THREE.MathUtils.degToRad(FOV)/2);
+function placeCamera(){ camera.position.set(0,0,camDist()); camera.lookAt(0,0,0); camera.aspect=W/H; camera.updateProjectionMatrix(); }
+
+scene.add(new THREE.AmbientLight(0xffffff,.72));
+const key = new THREE.DirectionalLight(0xffffff,1.15); key.position.set(-200,320,500); scene.add(key);
+const rim = new THREE.DirectionalLight(0x9db0ff,.5); rim.position.set(260,-120,240); scene.add(rim);
+
+// ---- post: cursor heat-haze (WebGL displacement that follows the cursor + trails, only over letters) ----
+renderer.setSize(W,H,false);
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera, null, new THREE.Color(0,0,0), 0));
+const hazePass = new ShaderPass({
+  uniforms:{ tDiffuse:{value:null}, uTime:{value:0}, uAspect:{value:W/H}, uScale:{value:0.006},
+    uRes:{value:new THREE.Vector2(W,H)},
+    uPts:{value: Array.from({length:6}, ()=>new THREE.Vector3(-9,-9,0))} },
+  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
+  fragmentShader:`
+    varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime,uAspect,uScale; uniform vec2 uRes; uniform vec3 uPts[6];
+    void main(){
+      // cursor + trail displacement (smooth heat-haze) — applied ONLY to the background
+      vec2 off=vec2(0.);
+      for(int i=0;i<6;i++){
+        float s=uPts[i].z; if(s<=0.0) continue;
+        vec2 d=vUv-uPts[i].xy; d.x*=uAspect;
+        float r=length(d); float fall=exp(-r*12.0);
+        float wob=sin(r*40.0 - uTime*3.2 + float(i)*1.7);
+        off += normalize(d+1e-5)*wob*fall*s;
+      }
+      vec2 buv = vUv + off*uScale;
+      // background: cool vertical wash (linear space) + faint dot grid, both warped by the haze
+      vec3 top=vec3(0.90,0.93,0.99), bot=vec3(0.74,0.80,0.92);
+      vec3 bg = mix(bot, top, buv.y);
+      vec2 cell = fract(buv*uRes/34.0) - 0.5;
+      float dot = smoothstep(0.17, 0.09, length(cell));
+      bg = mix(bg, bg*0.82, dot*0.5);
+      // letters composited crisp on top (NOT displaced -> no jitter)
+      vec4 L = texture2D(tDiffuse, vUv);
+      gl_FragColor = vec4(mix(bg, L.rgb, L.a), 1.0);
+    }`,
+});
+composer.addPass(hazePass);
+composer.addPass(new OutputPass());
+composer.setSize(W,H);
+if(renderer.capabilities.isWebGL2){ composer.renderTarget1.samples=4; composer.renderTarget2.samples=4; }  // MSAA so crisp letters don't alias
+
+const sx2w = x => x - W/2;
+const sy2w = y => -(y - H/2);
+
+// ---- physics ----
+const world = new CANNON.World({ gravity:new CANNON.Vec3(0,-K.grav,0) });
+world.allowSleep = true;
+world.defaultContactMaterial.restitution = K.rest;
+world.defaultContactMaterial.friction = .55;
+let floors = [];                                  // ONE infinite plane under the whole sentence
+const floorMeshes = new THREE.Group(); floorMeshes.visible=false; scene.add(floorMeshes);
+let lineYs = [];                                  // baseline y per line (world)
+
+function buildFloors(){
+  for(const b of floors) world.removeBody(b);
+  floors = []; floorMeshes.clear();
+  if(!lineYs.length) return;
+  const fy = Math.min(...lineYs) - K.drop;        // a single floor, just under the lowest line
+  const b = new CANNON.Body({ mass:0 }); b.addShape(new CANNON.Plane());
+  b.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);   // normal +Y
+  b.position.set(0,fy,0); world.addBody(b); floors.push(b);
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(W*1.6,6),
+    new THREE.MeshBasicMaterial({color:0x5b7cff,transparent:true,opacity:.5}));
+  g.position.set(0,fy,0); floorMeshes.add(g);
+}
+
+// ---- glyphs ----
+const baseMat = new THREE.MeshStandardMaterial({ color:0x14141a, roughness:.42, metalness:.05 });
+const accMat  = new THREE.MeshStandardMaterial({ color:0x1e40ff, roughness:.35, metalness:.08 });
+const glyphs = [];        // {mesh, home:Vector3, hw,hh,hd, lineY, state, off, voff, wasIn, body, landAt}
+let font = null;
+
+function highlightSet(s){
+  const set=new Set(); const i=s.indexOf('3D'); if(i>=0){set.add(i);set.add(i+1);}
+  for(let j=1;j<s.length;j++){ if(/[A-Z]/.test(s[j])&&/[a-z]/.test(s[j-1])) set.add(j); }
+  return set;
+}
+
+function buildGlyphs(){
+  for(const g of glyphs){ scene.remove(g.mesh); g.mesh.geometry.dispose(); if(g.body) world.removeBody(g.body); }
+  glyphs.length=0; lineYs=[];
+
+  const size=K.size, depth=size*0.2;
+  const res=font.data.resolution, scale=size/res;
+  const track=size*0.008;                                 // Montserrat sets well; just a touch of air
+  const advance = ch => ((font.data.glyphs[ch]||font.data.glyphs['?']).ha)*scale + track;
+  const lineGap=size*1.42, maxW=Math.min(1000,W*0.84), spaceW=advance(' ');
+  const HL=highlightSet(SENTENCE);
+
+  const words=SENTENCE.split(' ');
+  const lines=[]; let cur=[],curW=0;
+  const wordW = w => [...w].reduce((a,c)=>a+advance(c),0);
+  for(const w of words){
+    const ww=wordW(w);
+    if(cur.length && curW+spaceW+ww>maxW){ lines.push({words:cur,w:curW}); cur=[]; curW=0; }
+    if(cur.length) curW+=spaceW;
+    cur.push(w); curW+=ww;
+  }
+  if(cur.length) lines.push({words:cur,w:curW});
+
+  const blockH=(lines.length-1)*lineGap;
+  const topY=blockH/2 + H*0.05;                           // vertically centre the block (nudged above centre)
+  let ci=0;
+  lines.forEach((ln,li)=>{
+    let x=-ln.w/2; const y=topY-li*lineGap; lineYs.push(y);
+    ln.words.forEach((w,wi)=>{
+      for(const ch of w){
+        if(ch!==' '){
+          const geo=new TextGeometry(ch,{font,size,depth,curveSegments:5,
+            bevelEnabled:true,bevelThickness:size*0.02,bevelSize:size*0.015,bevelSegments:2});
+          geo.computeBoundingBox(); const bb=geo.boundingBox;
+          const hw=(bb.max.x-bb.min.x)/2, hh=(bb.max.y-bb.min.y)/2, hd=(bb.max.z-bb.min.z)/2;
+          geo.translate(-(bb.max.x+bb.min.x)/2,-(bb.max.y+bb.min.y)/2,-(bb.max.z+bb.min.z)/2);
+          const mesh=new THREE.Mesh(geo,(HL.has(ci)?accMat:baseMat).clone());
+          // LEFT-align the ink to the pen (geo is centred on its centroid above, so +hw puts its left edge at x).
+          // Centring on the cell instead dumped each glyph's advance as a trailing gap -> uneven, word-spaces lost.
+          const home=new THREE.Vector3(x+hw, y+(bb.max.y+bb.min.y)/2, 0);
+          mesh.position.copy(home); scene.add(mesh);
+          glyphs.push({ ch, mesh, home, hw, hh, hd:Math.max(hd,size*0.06), lineY:y,
+            state:'idle', off:new THREE.Vector2(), voff:new THREE.Vector2(), wasIn:false,
+            body:null, landAt:0, fellAt:0 });
+        }
+        x+=advance(ch); ci++;
+      }
+      if(wi<ln.words.length-1){ x+=spaceW; ci++; }
+    });
+  });
+  buildFloors();
+}
+
+// ---- cursor ----
+let cur=new THREE.Vector2(-1e4,-1e4), curVel=new THREE.Vector2(), haveCur=false, lastMove=0;
+let cx=-200, cy=-200;                          // cursor in client px (drives the DOM ring + the haze)
+const cursorEl=document.getElementById('cursor');
+addEventListener('pointermove', e=>{
+  cx=e.clientX; cy=e.clientY;
+  cursorEl.style.transform=`translate(${cx}px,${cy}px)`;
+  const p=new THREE.Vector2(sx2w(e.clientX), sy2w(e.clientY));
+  const t=performance.now();
+  if(haveCur){ const dt=Math.max((t-lastMove)/1000,1/120);   // dt floor kills the 1ms-event velocity spike
+    curVel.set(THREE.MathUtils.clamp((p.x-cur.x)/dt,-2000,2000),
+               THREE.MathUtils.clamp((p.y-cur.y)/dt,-2000,2000)); }
+  cur.copy(p); lastMove=t; haveCur=true;
+});
+addEventListener('pointerleave', ()=>{ cur.set(-1e4,-1e4); curVel.set(0,0); });
+
+// ---- knock a glyph down ----
+function knock(g){
+  const p=g.mesh.position;
+  const body=new CANNON.Body({ mass:1,
+    position:new CANNON.Vec3(p.x,p.y,p.z),
+    shape:new CANNON.Box(new CANNON.Vec3(g.hw,g.hh,g.hd)),
+    linearDamping:.1, angularDamping:.25 });
+  body.quaternion.copy(g.mesh.quaternion);
+  const kv=K.knock;
+  const vx=THREE.MathUtils.clamp(curVel.x,-1400,1400);
+  // knocked the way the cursor swipes (horizontal) + ALWAYS downward; never launches up
+  body.velocity.set(vx*0.35*kv, -110*kv + Math.min(0,curVel.y)*0.15, (Math.random()-.5)*60);
+  body.angularVelocity.set(
+    (Math.random()-.5)*4*kv,
+    (Math.random()-.5)*3,
+    (-vx*0.006 + (Math.random()-.5)*3)*kv);
+  world.addBody(body); g.body=body; g.state='fallen'; g.landAt=0; g.fellAt=performance.now();
+  g.off.set(0,0); g.voff.set(0,0);
+}
+
+function standUp(g){
+  if(g.body){ world.removeBody(g.body); g.body=null; }
+  g.state='rising';
+  g._r={ from:g.mesh.position.clone(), q0:g.mesh.quaternion.clone(), t0:performance.now(), dur:520 };
+}
+
+// ---- cursor heat-haze trail ----
+const trailPts=[];   // recent cursor samples in UV: {u,v,s}
+function updateHaze(t, over){
+  hazePass.uniforms.uTime.value = t/1000;
+  hazePass.uniforms.uScale.value = K.haze/2600;
+  for(const p of trailPts) p.s*=0.90;
+  while(trailPts.length && trailPts[0].s<0.03) trailPts.shift();
+  if((t-lastMove)<150){                         // trail follows the cursor anywhere now (bg is visible everywhere)
+    const u=cx/W, v=1-cy/H, head=trailPts[trailPts.length-1];
+    if(!head || Math.hypot(u-head.u,v-head.v)>0.012) trailPts.push({u,v,s:1});
+    if(trailPts.length>6) trailPts.shift();
+  }
+  const arr=hazePass.uniforms.uPts.value;
+  for(let i=0;i<6;i++){ const p=trailPts[i]; if(p) arr[i].set(p.u,p.v,p.s); else arr[i].set(-9,-9,0); }
+}
+
+// ---- loop ----
+let last=performance.now();
+const easeInOut = u => u<.5 ? 2*u*u : 1-Math.pow(-2*u+2,2)/2;
+function frame(){
+  const t=performance.now(), dt=Math.min((t-last)/1000,1/30); last=t;
+  // cursor goes stale if it stops moving (so a resting cursor doesn't keep shoving forever)
+  const moving = (t-lastMove) < 120;
+  let over=false;                              // cursor over/near any letter? -> gates the haze trail
+
+  for(const g of glyphs){
+    if(g.state==='idle'){
+      // hit-test: cursor inside the glyph's current rect -> topple on ENTER edge
+      const inside = moving &&
+        Math.abs(cur.x-g.mesh.position.x)<g.hw && Math.abs(cur.y-g.mesh.position.y)<g.hh;
+      if(inside && !g.wasIn){ g.wasIn=true; knock(g); continue; }
+      g.wasIn=inside;
+
+      // shove: target offset away from cursor within radius, critically-damped spring back
+      let tx=0,ty=0;
+      const dx=g.home.x-cur.x, dy=g.home.y-cur.y, d=Math.hypot(dx,dy);
+      if(d<K.shr*1.3) over=true;
+      // shove only while the cursor is actually MOVING; a parked cursor lets letters spring home (clean rest)
+      if(moving && d<K.shr && d>1e-3){ const f=1-d/K.shr; tx=dx/d*K.shd*f; ty=dy/d*K.shd*f; }
+      const ax=K.spr*(tx-g.off.x)-2*Math.sqrt(K.spr)*g.voff.x;
+      const ay=K.spr*(ty-g.off.y)-2*Math.sqrt(K.spr)*g.voff.y;
+      g.voff.x+=ax*dt; g.voff.y+=ay*dt; g.off.x+=g.voff.x*dt; g.off.y+=g.voff.y*dt;
+      g.mesh.position.set(g.home.x+g.off.x, g.home.y+g.off.y, 0);
+
+    } else if(g.state==='fallen'){
+      g.mesh.position.copy(g.body.position);
+      g.mesh.quaternion.copy(g.body.quaternion);
+      const speed=g.body.velocity.length()+g.body.angularVelocity.length()*8;
+      if(speed<25){ if(!g.landAt) g.landAt=t; } else g.landAt=0;
+      // stand back up once settled for `hold` — OR a hard fallback so a jostled letter never sticks
+      if((g.landAt && t-g.landAt>K.hold*1000) || (t-g.fellAt>K.hold*1000+2600)) standUp(g);
+
+    } else if(g.state==='rising'){
+      const r=g._r, u=Math.min((t-r.t0)/r.dur,1), e=easeInOut(u);
+      g.mesh.position.lerpVectors(r.from,g.home,e);
+      g.mesh.quaternion.slerpQuaternions(r.q0,new THREE.Quaternion(),e);
+      if(u>=1){ g.mesh.position.copy(g.home); g.mesh.quaternion.identity();
+        g.state='idle'; g.wasIn=false; g.off.set(0,0); g.voff.set(0,0); }
+    }
+  }
+
+  world.step(1/60, dt, 4);
+  updateHaze(t, over);
+  composer.render();
+  requestAnimationFrame(frame);
+}
+
+// ---- boot ----
+new FontLoader().load(FONT_URL, f=>{ font=f; placeCamera(); buildGlyphs(); requestAnimationFrame(frame); });
+
+// ---- resize ----
+let rz; addEventListener('resize', ()=>{ clearTimeout(rz); rz=setTimeout(()=>{
+  W=innerWidth; H=innerHeight; renderer.setSize(W,H,false); composer.setSize(W,H);
+  hazePass.uniforms.uAspect.value=W/H; hazePass.uniforms.uRes.value.set(W,H); placeCamera();
+  if(font && glyphs.every(g=>g.state==='idle')) buildGlyphs();
+},160); });
+renderer.setSize(W,H,false);
+</script>
+</body>
+</html>

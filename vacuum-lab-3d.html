@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vacuum-lab-3d — hero letters sucked into the card</title>
+<!--
+  VACUUM LAB (3D) — feasibility prototype for the hero idea.
+  Hover (or click) the card -> the big headline's letters get vacuumed down into it,
+  become a 3D physics playground you can stir with the cursor, then fly back to their
+  home positions when the pointer leaves.
+
+  DESIGN NOTES / KNOWN PLACEHOLDERS (read me):
+  - The headline is rendered AS 3D extruded glyphs from the start (no DOM->3D swap),
+    so the "suck" is seamless (no font pop).
+  - Glyph font = helvetiker_bold (only bold typeface on the three CDN). Swapping to
+    Montserrat = drop a Montserrat *.typeface.json and change FONT_URL. That is the
+    one real dependency to productionize; everything else is final-shape.
+  - Desktop-first (matches v3). Card is a plain DOM element; the 3D playground is
+    render-confined to its rect via clipping planes; physics is confined via walls.
+-->
+<style>
+  :root{
+    --ink:#14141a;          /* headline base */
+    --accent:#1e40ff;       /* cobalt (XR / 3D nod, site accent) */
+    --paper:#ffffff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--paper);
+    font-family:"Montserrat",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    color:var(--ink);
+    overflow:hidden;
+  }
+  /* three canvas — full viewport, sits under the DOM card, never eats pointer events */
+  #gl{position:fixed;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;display:block}
+
+  /* the vacuum target. Plain frosted card in the site register. */
+  #card{
+    position:fixed;
+    left:50%;top:56%;transform:translate(-50%,-50%);
+    width:min(560px,74vw);height:min(360px,44vh);
+    z-index:2;
+    border-radius:22px;
+    background:rgba(255,255,255,.55);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    border:1px solid rgba(30,64,255,.28);
+    box-shadow:0 24px 60px -24px rgba(20,20,40,.35), inset 0 0 0 1px rgba(255,255,255,.6);
+    cursor:pointer;
+    transition:box-shadow .35s ease, border-color .35s ease, background .35s ease;
+    display:flex;align-items:flex-end;justify-content:center;
+  }
+  #card.hot{
+    border-color:rgba(30,64,255,.6);
+    box-shadow:0 30px 80px -22px rgba(30,64,255,.45), inset 0 0 0 1px rgba(255,255,255,.8);
+    background:rgba(248,250,255,.5);
+  }
+  #card .hint{
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:rgba(30,64,255,.75);font-weight:600;
+    padding:0 0 16px;opacity:.9;transition:opacity .3s ease;
+    pointer-events:none;user-select:none;
+  }
+  #card.hot .hint{opacity:0}
+
+  /* HUD */
+  #hud{
+    position:fixed;top:12px;right:12px;z-index:10;
+    width:236px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+    background:rgba(18,18,26,.86);color:#e8e8f0;
+    border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 12px 10px;
+    backdrop-filter:blur(8px);user-select:none;
+  }
+  #hud h4{margin:0 0 8px;font:600 12px/1 ui-monospace;letter-spacing:.04em;color:#9db0ff}
+  #hud label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:5px 0}
+  #hud label span:last-child{color:#9db0ff;min-width:42px;text-align:right}
+  #hud input[type=range]{flex:1;accent-color:#5b7cff;height:3px}
+  #hud .row{display:flex;gap:6px;margin-top:8px}
+  #hud button{
+    flex:1;cursor:pointer;background:rgba(91,124,255,.16);color:#cdd6ff;
+    border:1px solid rgba(91,124,255,.35);border-radius:7px;padding:6px 4px;font:600 11px ui-monospace;
+  }
+  #hud button.on{background:#5b7cff;color:#0b0b12;border-color:#5b7cff}
+  #hud .seg{display:flex;gap:0;margin:2px 0 6px;border:1px solid rgba(91,124,255,.3);border-radius:7px;overflow:hidden}
+  #hud .seg button{border:0;border-radius:0;background:transparent}
+  #hud .seg button.on{background:#5b7cff;color:#0b0b12}
+  #hud .note{color:#8890a8;margin-top:8px;font-size:10px;line-height:1.45}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="card"><span class="hint">hover to vacuum</span></div>
+
+<div id="hud">
+  <h4>VACUUM LAB · 3D</h4>
+  <div class="seg" id="trigSeg">
+    <button data-trig="hover" class="on">hover</button>
+    <button data-trig="click">click</button>
+  </div>
+  <label>suck time<input id="k_suck" type="range" min=".25" max="1.4" step=".05" value=".7"><span id="v_suck"></span></label>
+  <label>stagger<input id="k_stag" type="range" min="0" max="24" step="1" value="9"><span id="v_stag"></span></label>
+  <label>swirl<input id="k_swirl" type="range" min="0" max="320" step="10" value="150"><span id="v_swirl"></span></label>
+  <label>gravity<input id="k_grav" type="range" min="0" max="2400" step="50" value="1100"><span id="v_grav"></span></label>
+  <label>bounce<input id="k_rest" type="range" min="0" max=".8" step=".05" value=".35"><span id="v_rest"></span></label>
+  <label>stir R<input id="k_sr" type="range" min="40" max="320" step="10" value="150"><span id="v_sr"></span></label>
+  <label>stir force<input id="k_sf" type="range" min="0" max="4000" step="100" value="1600"><span id="v_sf"></span></label>
+  <label>font size<input id="k_size" type="range" min="34" max="84" step="2" value="56"><span id="v_size"></span></label>
+  <div class="row"><button id="btnReset">reset</button><button id="btnWire">walls</button></div>
+  <div class="note">Headline is real 3D extruded glyphs. Font = helvetiker_bold placeholder (swap Montserrat .typeface.json later).</div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+  "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import * as CANNON from 'cannon-es';
+
+const FONT_URL = 'https://cdn.jsdelivr.net/npm/three@0.169.0/examples/fonts/helvetiker_bold.typeface.json';
+const SENTENCE = "We create 3D visual and interactive eXpeRience that help put your product in customer's hands.";
+
+// ---- tunables (mirrored by HUD) ----
+const K = {
+  suck:.7, stagger:9, swirl:150, grav:1100, rest:.35,
+  stirR:150, stirF:1600, size:56, trigger:'hover', walls:false,
+};
+
+// ---- three basics ----
+const canvas = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.localClippingEnabled = true;
+const scene = new THREE.Scene();
+
+let W = innerWidth, H = innerHeight;
+const FOV = 42;
+const camera = new THREE.PerspectiveCamera(FOV, W/H, 1, 6000);
+// Distance so that at z=0 the world is pixel-mapped & centred (1 unit == 1 px, origin = screen centre).
+function camDist(){ return (H/2) / Math.tan(THREE.MathUtils.degToRad(FOV)/2); }
+function placeCamera(){ camera.position.set(0,0,camDist()); camera.lookAt(0,0,0); camera.aspect=W/H; camera.updateProjectionMatrix(); }
+
+scene.add(new THREE.AmbientLight(0xffffff,.72));
+const key = new THREE.DirectionalLight(0xffffff,1.15); key.position.set(-200,300,500); scene.add(key);
+const rim = new THREE.DirectionalLight(0x9db0ff,.5); rim.position.set(260,-120,240); scene.add(rim);
+
+// screen(px) -> world at z=0
+const sx2w = x => x - W/2;
+const sy2w = y => -(y - H/2);
+
+// ---- physics ----
+const world = new CANNON.World({ gravity:new CANNON.Vec3(0,-K.grav,0) });
+world.allowSleep = true;
+world.defaultContactMaterial.restitution = K.rest;
+world.defaultContactMaterial.friction = .4;
+let walls = [];
+const wallMeshes = new THREE.Group(); wallMeshes.visible = false; scene.add(wallMeshes);
+
+// ---- glyphs ----
+const base = new THREE.MeshStandardMaterial({ color:0x14141a, roughness:.42, metalness:.05 });
+const accent = new THREE.MeshStandardMaterial({ color:0x1e40ff, roughness:.35, metalness:.08 });
+const glyphs = [];            // {mesh, home:Vector3, hw,hh,hd, body, anim}
+let font = null;
+let clipPlanes = [];          // 4 side planes of the card (world space)
+
+// highlight set: "3D" + mid-word caps (the X,R in eXpeRience)
+function highlightSet(s){
+  const set = new Set();
+  const i = s.indexOf('3D'); if(i>=0){ set.add(i); set.add(i+1); }
+  for(let j=1;j<s.length;j++){ if(/[A-Z]/.test(s[j]) && /[a-z]/.test(s[j-1])) set.add(j); }
+  return set;
+}
+
+function buildGlyphs(){
+  // clear old
+  for(const g of glyphs){ scene.remove(g.mesh); g.mesh.geometry.dispose(); if(g.body) world.removeBody(g.body); }
+  glyphs.length = 0;
+
+  const size = K.size, depth = size*0.2;
+  const res = font.data.resolution, scale = size/res;
+  const advance = ch => ((font.data.glyphs[ch]||font.data.glyphs['?']).ha) * scale;
+  const lineGap = size*1.34;
+  const maxW = Math.min(940, W*0.82);
+  const HL = highlightSet(SENTENCE);
+
+  // greedy word-wrap using true advances
+  const words = SENTENCE.split(' ');
+  const lines = []; let cur = [], curW = 0;
+  const wordW = w => [...w].reduce((a,c)=>a+advance(c),0);
+  const spaceW = advance(' ');
+  for(const w of words){
+    const ww = wordW(w);
+    if(cur.length && curW + spaceW + ww > maxW){ lines.push({words:cur,w:curW}); cur=[]; curW=0; }
+    if(cur.length){ curW += spaceW; }
+    cur.push(w); curW += ww;
+  }
+  if(cur.length) lines.push({words:cur,w:curW});
+
+  const topY = H/2 - Math.max(70, H*0.10);   // first baseline near the top
+  let ci = 0;                                 // running char index into SENTENCE (for HL)
+  lines.forEach((ln, li)=>{
+    let x = -ln.w/2;
+    const y = topY - li*lineGap;
+    ln.words.forEach((w, wi)=>{
+      for(const ch of w){
+        if(ch !== ' '){
+          const geo = new TextGeometry(ch,{ font, size, depth, curveSegments:5,
+            bevelEnabled:true, bevelThickness:size*0.02, bevelSize:size*0.015, bevelSegments:2 });
+          geo.computeBoundingBox();
+          const bb = geo.boundingBox;
+          const hw=(bb.max.x-bb.min.x)/2, hh=(bb.max.y-bb.min.y)/2, hd=(bb.max.z-bb.min.z)/2;
+          // recentre geometry on its own centroid so physics box & rotation are sane
+          geo.translate(-(bb.max.x+bb.min.x)/2, -(bb.max.y+bb.min.y)/2, -(bb.max.z+bb.min.z)/2);
+          const mat = (HL.has(ci)?accent:base).clone();
+          const mesh = new THREE.Mesh(geo, mat);
+          const home = new THREE.Vector3(x + (bb.max.x+bb.min.x)/2, y + (bb.max.y+bb.min.y)/2, 0);
+          mesh.position.copy(home);
+          scene.add(mesh);
+          glyphs.push({ mesh, home, hw, hh, hd:Math.max(hd,size*0.06), body:null,
+                        anim:{mode:'idle'} });
+        }
+        x += advance(ch); ci++;
+      }
+      if(wi < ln.words.length-1){ x += spaceW; ci++; } // the space
+    });
+  });
+}
+
+// ---- card <-> world box ----
+const card = document.getElementById('card');
+let box = null;   // {minX,maxX,minY,maxY,zHalf,cx,cy}
+function computeBox(){
+  const r = card.getBoundingClientRect();
+  box = {
+    minX:sx2w(r.left), maxX:sx2w(r.right),
+    minY:sy2w(r.bottom), maxY:sy2w(r.top),
+    zHalf:70,
+    cx:sx2w(r.left+r.width/2), cy:sy2w(r.top+r.height/2),
+  };
+  clipPlanes = [
+    new THREE.Plane(new THREE.Vector3( 1,0,0), -box.minX),
+    new THREE.Plane(new THREE.Vector3(-1,0,0),  box.maxX),
+    new THREE.Plane(new THREE.Vector3(0, 1,0), -box.minY),
+    new THREE.Plane(new THREE.Vector3(0,-1,0),  box.maxY),
+  ];
+  buildWalls();
+}
+function buildWalls(){
+  for(const b of walls) world.removeBody(b);
+  walls = []; wallMeshes.clear();
+  const {minX,maxX,minY,maxY,zHalf} = box;
+  const mk = (nx,ny,nz, px,py,pz, ax,ay,az,ang)=>{
+    const b = new CANNON.Body({ mass:0 }); b.addShape(new CANNON.Plane());
+    b.quaternion.setFromAxisAngle(new CANNON.Vec3(ax,ay,az), ang);
+    b.position.set(px,py,pz); world.addBody(b); walls.push(b);
+  };
+  mk(0,1,0,  0,minY,0,  1,0,0,-Math.PI/2);   // floor
+  mk(0,-1,0, 0,maxY,0,  1,0,0, Math.PI/2);   // ceiling
+  mk(1,0,0,  minX,0,0,  0,1,0, Math.PI/2);   // left
+  mk(-1,0,0, maxX,0,0,  0,1,0,-Math.PI/2);   // right
+  mk(0,0,1,  0,0,-zHalf, 0,1,0, 0);          // back
+  mk(0,0,-1, 0,0, zHalf, 0,1,0, Math.PI);    // front
+  // debug wall frame
+  const g = new THREE.Mesh(
+    new THREE.BoxGeometry(maxX-minX, maxY-minY, zHalf*2),
+    new THREE.MeshBasicMaterial({ color:0x5b7cff, wireframe:true }));
+  g.position.set((minX+maxX)/2,(minY+maxY)/2,0); wallMeshes.add(g);
+}
+
+// ---- state machine ----
+let mode = 'idle';                 // idle | suck | play | return
+const now = ()=>performance.now();
+const easeInOut = u => u<.5 ? 2*u*u : 1-Math.pow(-2*u+2,2)/2;
+const easeOutBack = u => { const c1=1.70158, c3=c1+1; return 1+c3*Math.pow(u-1,3)+c1*Math.pow(u-1,2); };
+
+function randQuat(){ const q=new THREE.Quaternion(); q.setFromEuler(new THREE.Euler(
+  (Math.random()-.5)*6,(Math.random()-.5)*6,(Math.random()-.5)*6)); return q; }
+
+// begin vacuum: tween every glyph home -> card, curved (bezier) + spin + pinch, staggered
+function startSuck(){
+  mode = 'suck'; card.classList.add('hot');
+  const t0 = now();
+  glyphs.forEach((g,i)=>{
+    const from = g.mesh.position.clone();
+    const to = new THREE.Vector3(
+      box.cx + (Math.random()-.5)*(box.maxX-box.minX)*0.5,
+      box.cy + (Math.random()-.5)*(box.maxY-box.minY)*0.4,
+      (Math.random()-.5)*box.zHalf);
+    // control point: midpoint pushed perpendicular for the spiral vacuum path
+    const mid = from.clone().lerp(to,.5);
+    const dir = to.clone().sub(from); const perp = new THREE.Vector3(-dir.y,dir.x,0).normalize();
+    const ctrl = mid.add(perp.multiplyScalar((Math.random()<.5?-1:1)*K.swirl));
+    g.anim = { mode:'suck', from, ctrl, to,
+      q0:g.mesh.quaternion.clone(), q1:randQuat(),
+      start:t0 + i*K.stagger, dur:K.suck*1000 };
+  });
+}
+
+// hand a single glyph to physics (called when its suck tween lands)
+function toPhysics(g){
+  g.mesh.material.clippingPlanes = clipPlanes;      // confine to card from now on
+  const p = g.mesh.position;
+  const body = new CANNON.Body({
+    mass:1, position:new CANNON.Vec3(p.x,p.y,p.z),
+    shape:new CANNON.Box(new CANNON.Vec3(g.hw,g.hh,g.hd)),
+    linearDamping:.12, angularDamping:.18,
+  });
+  body.quaternion.copy(g.mesh.quaternion);
+  body.velocity.set((box.cx-p.x)*1.2,(box.cy-p.y)*1.2,(Math.random()-.5)*120);
+  body.angularVelocity.set((Math.random()-.5)*8,(Math.random()-.5)*8,(Math.random()-.5)*8);
+  world.addBody(body); g.body = body; g.anim = { mode:'physics' };
+}
+
+function startReturn(){
+  mode = 'return'; card.classList.remove('hot');
+  const t0 = now();
+  glyphs.forEach((g,i)=>{
+    if(g.body){ world.removeBody(g.body); g.body=null; }
+    g.mesh.material.clippingPlanes = null;          // visible flying back out
+    g.anim = { mode:'return', from:g.mesh.position.clone(), to:g.home.clone(),
+      q0:g.mesh.quaternion.clone(), q1:new THREE.Quaternion(),
+      start:t0 + i*K.stagger*0.6, dur:K.suck*1000*1.05 };
+  });
+}
+
+// ---- pointer stir ----
+let stir = null;   // world point while pointer moves during play
+addEventListener('pointermove', e=>{ stir = new THREE.Vector3(sx2w(e.clientX), sy2w(e.clientY), 0); });
+function applyStir(){
+  if(!stir) return;
+  const r2 = K.stirR*K.stirR;
+  for(const g of glyphs){
+    if(!g.body) continue;
+    const dx=g.body.position.x-stir.x, dy=g.body.position.y-stir.y;
+    const d2=dx*dx+dy*dy;
+    if(d2<r2 && d2>1){
+      const d=Math.sqrt(d2), f=K.stirF*(1-d/K.stirR);
+      g.body.applyImpulse(new CANNON.Vec3(dx/d*f, dy/d*f, 0), g.body.position);
+      g.body.wakeUp();
+    }
+  }
+}
+
+// ---- triggers ----
+function fire(){ if(mode==='idle'||mode==='return') startSuck(); }
+function release(){ if(mode==='suck'||mode==='play') startReturn(); }
+card.addEventListener('pointerenter', ()=>{ if(K.trigger==='hover') fire(); });
+card.addEventListener('pointerleave', ()=>{ if(K.trigger==='hover') release(); });
+card.addEventListener('click', ()=>{ if(K.trigger!=='click') return; (mode==='idle'||mode==='return')?fire():release(); });
+
+// ---- loop ----
+let last = now();
+function frame(){
+  const t = now(), dt = Math.min((t-last)/1000,1/30); last = t;
+
+  let anyTween=false, allLanded=true;
+  for(const g of glyphs){
+    const a = g.anim;
+    if(a.mode==='suck'){
+      anyTween=true; allLanded=false;
+      const u = Math.max(0,Math.min(1,(t-a.start)/a.dur));
+      const e = easeInOut(u), it=1-e;
+      // quadratic bezier
+      g.mesh.position.set(
+        it*it*a.from.x + 2*it*e*a.ctrl.x + e*e*a.to.x,
+        it*it*a.from.y + 2*it*e*a.ctrl.y + e*e*a.to.y,
+        it*it*a.from.z + 2*it*e*a.ctrl.z + e*e*a.to.z);
+      g.mesh.quaternion.slerpQuaternions(a.q0,a.q1,e);
+      const pinch = 1 - 0.42*Math.sin(Math.PI*u);   // squeeze-through, ends at 1
+      g.mesh.scale.setScalar(pinch);
+      if(u>=1){ g.mesh.scale.setScalar(1); toPhysics(g); }
+    } else if(a.mode==='return'){
+      anyTween=true; allLanded=false;
+      const u = Math.max(0,Math.min(1,(t-a.start)/a.dur));
+      const e = easeOutBack(Math.min(u,1));
+      g.mesh.position.lerpVectors(a.from,a.to,easeInOut(u));
+      g.mesh.quaternion.slerpQuaternions(a.q0,a.q1,easeInOut(u));
+      g.mesh.scale.setScalar(1);
+      if(u>=1){ g.mesh.position.copy(g.home); g.mesh.quaternion.identity(); g.anim={mode:'idle'}; }
+    } else if(a.mode==='physics' && g.body){
+      g.mesh.position.copy(g.body.position);
+      g.mesh.quaternion.copy(g.body.quaternion);
+    }
+  }
+
+  // suck -> play once every glyph has been handed to physics
+  if(mode==='suck' && glyphs.every(g=>g.anim.mode==='physics')) mode='play';
+  // return -> idle once all settled
+  if(mode==='return' && glyphs.every(g=>g.anim.mode==='idle')) mode='idle';
+
+  if(mode==='play'||mode==='suck'){ applyStir(); world.step(1/60, dt, 4); }
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+// ---- boot ----
+new FontLoader().load(FONT_URL, f=>{
+  font = f;
+  placeCamera(); buildGlyphs(); computeBox();
+  requestAnimationFrame(frame);
+});
+
+// ---- resize ----
+let rz;
+addEventListener('resize', ()=>{
+  clearTimeout(rz);
+  rz = setTimeout(()=>{
+    W=innerWidth; H=innerHeight;
+    renderer.setSize(W,H,false);
+    placeCamera();
+    if(font && mode==='idle'){ buildGlyphs(); }   // relayout only when at rest
+    computeBox();
+  },160);
+});
+renderer.setSize(W,H,false);
+
+// ---- HUD wiring ----
+const bind = (id, key, fmt=v=>v)=>{
+  const el=document.getElementById(id), out=document.getElementById('v_'+id.slice(2));
+  const upd=()=>{ K[key]=parseFloat(el.value); out.textContent=fmt(K[key]); };
+  el.addEventListener('input', ()=>{ upd(); onKnob(key); }); upd();
+};
+function onKnob(key){
+  if(key==='grav') world.gravity.set(0,-K.grav,0);
+  if(key==='rest') world.defaultContactMaterial.restitution=K.rest;
+  if(key==='size' && font && mode==='idle'){ buildGlyphs(); computeBox(); }
+}
+bind('k_suck','suck',v=>v.toFixed(2)+'s');
+bind('k_stag','stagger',v=>v+'ms');
+bind('k_swirl','swirl');
+bind('k_grav','grav');
+bind('k_rest','rest',v=>v.toFixed(2));
+bind('k_sr','stirR');
+bind('k_sf','stirF');
+bind('k_size','size');
+
+document.querySelectorAll('#trigSeg button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#trigSeg button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); K.trigger=b.dataset.trig;
+  card.querySelector('.hint').textContent = K.trigger==='hover'?'hover to vacuum':'click to vacuum';
+}));
+document.getElementById('btnReset').addEventListener('click',()=>{
+  if(mode!=='idle'){ startReturn(); }
+});
+document.getElementById('btnWire').addEventListener('click',e=>{
+  K.walls=!K.walls; wallMeshes.visible=K.walls; e.target.classList.toggle('on',K.walls);
+});
+</script>
+</body>
+</html>
