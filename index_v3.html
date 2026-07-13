@@ -411,6 +411,13 @@ if(introEl){
   setTimeout(introFinish, 12000);   // safety net: never hang the gate if an asset stalls
 }
 
+// ===== MOBILE: the tokonoma 3D scene must NOT boot at all — no #gl WebGL context, no PMREM / render-targets / composer. Only the intro gate (above) + drawer nav run here; the mobile How-it-works has its own #glm Shinobu scene. =====
+if(isMobile){
+  if(cv) cv.style.display='none';
+  introFinish();                                                                                          // resolve the load gate on the min-duration clock
+  window.__nav = (id)=>{ const t=document.getElementById(id); if(t) t.scrollIntoView({behavior:'smooth', block:'start'}); };   // drawer nav still needs this on mobile
+} else {
+
 const renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile ? 1.5 : 2));
 renderer.setSize(W,H);
@@ -449,7 +456,7 @@ let envMode = 'off';
 scene.environment = darkEnv;      // dark transient env: keeps lacquer dark + envMap define present for compile
 scene.environmentIntensity = 0;
 
-if(isMobile){ cv.style.display='none'; introFinish(); }   // MOBILE DIAGNOSTIC: tokonoma scene killed — resolve the load gate on min-duration, hide its canvas
+// (mobile handled above — everything from the renderer down is desktop-only, inside the !isMobile branch)
 if(!isMobile) new EXRLoader().load('Tokonama%20Scene/japanese-room_2K_42d6555f-dde5-4c27-873f-2bdc57fcc945.exr', (tex)=>{
   tex.mapping = THREE.EquirectangularReflectionMapping;
   hdrTex = tex; hdrEnv = pmrem.fromEquirectangular(tex).texture; applyEnv('hdri');
@@ -1127,9 +1134,10 @@ function loop(){
   if(window.__exitWipe) window.__exitWipe.frame(_exitP);   // v3: exit strips — draw AFTER the scene render so #bleed2 samples this fresh frame
   requestAnimationFrame(loop);
 }
-if(!isMobile) loop();   // runs once, immediately pauses (sceneActive=false until How-it-works is in view). MOBILE: scene killed → no loop
+loop();   // desktop only (inside the !isMobile branch): runs once, self-pauses until How-it-works is on screen
 // v3: wake the render loop when the How-it-works section enters the viewport, let it self-pause when it leaves (Lusion "render only when visible")
-if(!isMobile) new IntersectionObserver(es=>es.forEach(e=>{ sceneActive = e.isIntersecting; if(sceneActive && rafPaused){ rafPaused=false; loop(); } }), {rootMargin:'30% 0px 30% 0px'}).observe(processEl);
+new IntersectionObserver(es=>es.forEach(e=>{ sceneActive = e.isIntersecting; if(sceneActive && rafPaused){ rafPaused=false; loop(); } }), {rootMargin:'30% 0px 30% 0px'}).observe(processEl);
+}   // ===== /!isMobile — end tokonoma scene (desktop only) =====
 </script>
 
 <!-- ===== SITE BODY behaviors: i18n copy swap + compare slider (drawer is Step 2) ===== -->
@@ -1425,7 +1433,9 @@ try{(function(){
 <!-- ===== EXIT WIPE (Method A) — #bleed2: a 2nd WebGL2 strips scrim that SAMPLES the live tokonoma render and eats it strip-by-strip to reveal the site below. Same shader family as the load #bleed (ink-edge + critically-damped SOD glide), own seed so the two wipes aren't carbon copies. Driven by the scene loop (drawn right AFTER composer.render → samples a fresh frame). Replaces the per-frame CSS mask (Method B). ===== -->
 <script>
 try{(function(){
-  const canvas=document.getElementById('bleed2'), glCanvas=document.getElementById('gl');
+  const IS_COARSE = matchMedia('(pointer:coarse)').matches;
+  const canvas=document.getElementById('bleed2');
+  const glCanvas=document.getElementById(IS_COARSE ? 'glm' : 'gl');   // MOBILE: the exit wipe eats the #glm Shinobu scene (desktop eats the #gl tokonoma) — same shader, different source canvas. Driven by whichever scene loop is live.
   if(!canvas||!glCanvas) return;
   const gl=canvas.getContext('webgl2',{alpha:true,antialias:false,premultipliedAlpha:true});
   if(!gl){ return; }   // no webgl2 → leave __exitWipe undefined; #gl still fades out on exit (plain fallback, site still reachable)
@@ -1914,7 +1924,7 @@ if(IS_COARSE && window.DeviceMotionEvent){
 }catch(e){ console.warn('topple hero off:', e); }
 </script>
 
-<!-- ===== MOBILE How-it-works: art-directed Shinobu materialize (ported from old index.html), scroll-driven. STEP 1: scene + scroll-scrub materialize (fullscreen); card/expand/hold/scrim still TODO. ===== -->
+<!-- ===== MOBILE How-it-works: art-directed Shinobu materialize (ported from old index.html), scroll-driven. Scene + scroll-scrub materialize (fullscreen) → EXIT strips wipe (#bleed2 eats the #glm scene → reveals the site/FAQ). Card→expand framing still TODO. ===== -->
 <script type="module">
 if(matchMedia('(pointer:coarse)').matches) (async()=>{ try{
 const THREE = await import('three');
@@ -2014,22 +2024,34 @@ function setForm(f){
 }
 
 function scrollProgress(){ const r=processEl.getBoundingClientRect(), sc=r.height-innerHeight; return sc>0?Math.min(Math.max(-r.top/sc,0),1):0; }
+const clamp=v=>v<0?0:v>1?1:v;
 
+// zones across #process: materialize 0–.5 · hold .5–.67 · EXIT strips wipe .67–1. EX_START matches the desktop wipe + the --faq-overlap math so the site (FAQ) is pinned behind before the bars rise.
+const EX_START=0.67;
 let targetF=0, curF=0, active=false, raf=false;
 function loop(){
   if(!active){ raf=false; return; }
-  targetF=Math.min(1, scrollProgress()/0.5);            // materialize over the first ~half of #process (step 1; zones tuned later)
+  const sp=scrollProgress();
+  targetF=Math.min(1, sp/0.5);                          // materialize over the first ~half of #process
   curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
   setForm(curF);
-  const formed=Math.max(0,Math.min(1,(curF-0.55)/0.45));
+  const formed=clamp((curF-0.55)/0.45);
   bloom.strength=0.85*(1-formed); bloom.enabled=formed<1;
   const lit=1-0.6*formed; key.intensity=KEY0*lit; fill.intensity=FILL0*lit; rim.intensity=RIM0*lit; amb.intensity=AMB0*lit;
   pivot.rotation.y = curF*0.6 + performance.now()*0.00006;   // form-rotation + gentle idle spin
   composer.render();
+  // ===== EXIT (scene → website): the #bleed2 strips scrim SAMPLES this fresh #glm frame + eats it strip-by-strip, revealing the site (FAQ) below. #glm fades to 0 as the scrim takes over, so eaten columns never show the raw scene under it. =====
+  const exitP = clamp((sp-EX_START)/(1-EX_START));
+  if(exitP>0) cv.style.opacity = (1-clamp(exitP/0.05)).toFixed(3);   // brief cross-hand: #glm → 0 while the scrim still shows ~the full scene (nothing eaten yet) → invisible swap
+  else if(cv.style.opacity!=='1') cv.style.opacity='1';              // scrolled back out of the exit → hand the scene back
+  if(window.__exitWipe) window.__exitWipe.frame(exitP);              // MUST be right after composer.render() → the #glm drawing buffer is still valid to sample
   requestAnimationFrame(loop);
 }
 addEventListener('resize',()=>{ W=innerWidth;H=innerHeight; renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix(); composer.setSize(W,H); });
-new IntersectionObserver(es=>es.forEach(e=>{ active=e.isIntersecting; cv.style.opacity=active?'1':'0'; if(active&&!raf){ raf=true; loop(); } }),{rootMargin:'0px'}).observe(processEl);
+new IntersectionObserver(es=>es.forEach(e=>{ active=e.isIntersecting;
+  if(active){ cv.style.opacity='1'; if(!raf){ raf=true; loop(); } }                    // loop owns cv opacity (exit fade) while active; '1' here restores it on re-entry
+  else { cv.style.opacity='0'; if(window.__exitWipe) window.__exitWipe.hide(); }        // leaving How-it-works → hide the scene + retract the exit scrim
+}),{rootMargin:'0px'}).observe(processEl);
 }catch(e){ console.warn('mobile shinobu scene off:', e); } })();
 </script>
 </body>
