@@ -196,6 +196,7 @@
   #process{min-height:440vh;position:relative}
   #sceneStage{position:sticky;top:0;height:100vh;display:flex;align-items:center;justify-content:center}   /* pins the card at viewport centre while the runway scrolls → the windowed scene stays PUT (content no longer slides under the moving crop) */
   #sceneWindow{width:min(62vw,900px);height:64vh;border-radius:16px}   /* the card the fixed canvas clip-path tracks; expand → fullscreen is a TIME tween (see winExpand), NOT scroll-scrubbed */
+  @media (pointer:coarse){ #sceneWindow{width:74vw;height:50vh;border-radius:18px} }   /* mobile: narrower/taller card to frame the standing bottle (eyeball knob) */
   /* v3: FAQ reveal-in-place. #faqReveal overlaps the scene's final screen (--faq-overlap) so the FAQ is already pinned BEHIND the fullscreen scene BEFORE the bars start; #faq sticks to top:0 → the exit strips uncover it in place (no scroll-slide). It holds for --faq-pin, then releases into normal scroll (→ Contact). Both are eyeball knobs.
      MATH: runway sp maps to ~340vh of scroll; wipe = sp .67→1.0 = the last ~112vh. overlap 240vh → pin starts ~sp .59 (safely before the bars); pin 180vh → holds through the wipe + ~40vh past, then releases. */
   :root{--faq-overlap:240vh; --faq-pin:180vh}
@@ -1491,7 +1492,8 @@ try{(function(){
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 
-  function resize(){ const dpr=Math.min(devicePixelRatio||1,2); canvas.width=Math.round(innerWidth*dpr); canvas.height=Math.round(innerHeight*dpr); gl.viewport(0,0,canvas.width,canvas.height); }
+  // NB: CSS display box must match the backing store, else the sampled scene stretches. On mobile the CSS rule's 100vh ≠ innerHeight (dynamic address bar), so pin the style to innerHeight px like three's setSize does for #gl/#glm — otherwise #bleed2 renders the scene vertically stretched at the exit handoff.
+  function resize(){ const dpr=Math.min(devicePixelRatio||1,2); canvas.width=Math.round(innerWidth*dpr); canvas.height=Math.round(innerHeight*dpr); canvas.style.width=innerWidth+'px'; canvas.style.height=innerHeight+'px'; gl.viewport(0,0,canvas.width,canvas.height); }
   addEventListener('resize',resize); resize();
 
   class SOD{ constructor(v,f,z,r){ this.k1=z/(Math.PI*f); this.k2=1/((2*Math.PI*f)**2); this.k3=r*z/(2*Math.PI*f); this.x=v; this.y=v; this.yd=0; }
@@ -1938,7 +1940,7 @@ const [{GLTFLoader},{MeshSurfaceSampler},{EffectComposer},{RenderPass},{UnrealBl
   import('three/addons/postprocessing/OutputPass.js'),
   import('three/addons/environments/RoomEnvironment.js') ]);
 
-const cv=document.getElementById('glm'), processEl=document.getElementById('process');
+const cv=document.getElementById('glm'), processEl=document.getElementById('process'), sceneWindowEl=document.getElementById('sceneWindow');
 let W=innerWidth, H=innerHeight;
 const renderer=new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
@@ -2027,20 +2029,35 @@ function setForm(f){
 function scrollProgress(){ const r=processEl.getBoundingClientRect(), sc=r.height-innerHeight; return sc>0?Math.min(Math.max(-r.top/sc,0),1):0; }
 const clamp=v=>v<0?0:v>1?1:v;
 
-// zones across #process: materialize 0–.5 · hold .5–.67 · EXIT strips wipe .67–1. EX_START matches the desktop wipe + the --faq-overlap math so the site (FAQ) is pinned behind before the bars rise.
+// zones across #process: windowed card 0–.06 · card opens (winExpand tween, armed at .06) · materialize .14–.44 · hold .44–.67 · EXIT strips wipe .67–1. EX_START matches the desktop wipe + the --faq-overlap math so the site (FAQ) is pinned behind before the bars rise.
 const EX_START=0.67;
-let targetF=0, curF=0, active=false, raf=false;
+let targetF=0, curF=0, winExpand=0, active=false, raf=false, lastT=performance.now();
 function loop(){
   if(!active){ raf=false; return; }
+  const now=performance.now(), dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
   const sp=scrollProgress();
-  targetF=Math.min(1, sp/0.5);                          // materialize over the first ~half of #process
+
+  // ===== CARD → EXPAND (Lusion window framing): the scene sits framed in the #sceneWindow card, then TIME-tweens open to fullscreen once scroll arms it (never scroll-scrubbed → smooth + symmetric on reverse). =====
+  const wantExpand = sp>0.06 ? 1 : 0;
+  winExpand += (wantExpand-winExpand)*(1-Math.pow(0.012,dt));   // ~0.7s ease, framerate-independent
+  if(Math.abs(wantExpand-winExpand)<0.0006) winExpand=wantExpand;
+  const expand=winExpand, k=1-expand;
+
+  targetF = clamp((sp-0.14)/0.30);                     // materialize AFTER the card starts opening
   curF += (targetF-curF)*0.1; if(Math.abs(targetF-curF)<0.0004) curF=targetF;
   setForm(curF);
   const formed=clamp((curF-0.55)/0.45);
-  bloom.strength=0.85*(1-formed); bloom.enabled=formed<1;
+  // windowed "ember": compress the scatter into a compact glow that fits the card (expand 0) → opens to the full shell as it expands; spin only as it opens.
+  if(points){ const pulse=1+0.05*Math.sin(now*0.0016); points.scale.setScalar((0.12+0.88*expand)*(expand<0.99?pulse:1)); }
+  pivot.rotation.y = (curF*0.6 + now*0.00006)*expand;   // no spin while windowed
+  bloom.strength=0.85*(1-formed)*(0.5+0.5*expand); bloom.enabled=formed<1;   // dim the bloom while windowed so the ember glows warm, not blown to white
   const lit=1-0.6*formed; key.intensity=KEY0*lit; fill.intensity=FILL0*lit; rim.intensity=RIM0*lit; amb.intensity=AMB0*lit;
-  pivot.rotation.y = curF*0.6 + performance.now()*0.00006;   // form-rotation + gentle idle spin
   composer.render();
+
+  // clip the fullscreen canvas to the card's LIVE rect, lerp out to the full viewport by `expand` (rounded corners fade with k). Held fullscreen (k=0) through the exit.
+  const wr=sceneWindowEl.getBoundingClientRect();
+  const cT=Math.max(0,wr.top)*k, cL=Math.max(0,wr.left)*k, cR=Math.max(0,innerWidth-wr.right)*k, cB=Math.max(0,innerHeight-wr.bottom)*k;
+  cv.style.clipPath = k>0.001 ? `inset(${cT.toFixed(1)}px ${cR.toFixed(1)}px ${cB.toFixed(1)}px ${cL.toFixed(1)}px round ${(18*k).toFixed(1)}px)` : 'none';
   // ===== EXIT (scene → website): the #bleed2 strips scrim SAMPLES this fresh #glm frame + eats it strip-by-strip, revealing the site (FAQ) below. #glm fades to 0 as the scrim takes over, so eaten columns never show the raw scene under it. =====
   const exitP = clamp((sp-EX_START)/(1-EX_START));
   if(exitP>0) cv.style.opacity = (1-clamp(exitP/0.05)).toFixed(3);   // brief cross-hand: #glm → 0 while the scrim still shows ~the full scene (nothing eaten yet) → invisible swap
