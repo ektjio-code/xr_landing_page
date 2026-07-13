@@ -439,7 +439,8 @@ let envMode = 'off';
 scene.environment = darkEnv;      // dark transient env: keeps lacquer dark + envMap define present for compile
 scene.environmentIntensity = 0;
 
-new EXRLoader().load('Tokonama%20Scene/japanese-room_2K_42d6555f-dde5-4c27-873f-2bdc57fcc945.exr', (tex)=>{
+if(isMobile){ cv.style.display='none'; introFinish(); }   // MOBILE DIAGNOSTIC: tokonoma scene killed — resolve the load gate on min-duration, hide its canvas
+if(!isMobile) new EXRLoader().load('Tokonama%20Scene/japanese-room_2K_42d6555f-dde5-4c27-873f-2bdc57fcc945.exr', (tex)=>{
   tex.mapping = THREE.EquirectangularReflectionMapping;
   hdrTex = tex; hdrEnv = pmrem.fromEquirectangular(tex).texture; applyEnv('hdri');
   glassMats.forEach(m=>{ m.envMap = hdrEnv; m.needsUpdate = true; }); // fake glass reflects the room
@@ -657,7 +658,7 @@ function setForm(f){
   points.material.opacity=0.9*(1-meshIn); points.visible=meshIn<1;
 }
 
-new GLTFLoader().load('Tokonama%20Scene/shinobu_tokonoma.glb', async (gltf)=>{
+if(!isMobile) new GLTFLoader().load('Tokonama%20Scene/shinobu_tokonoma.glb', async (gltf)=>{
   const obj = gltf.scene;
   scene.add(obj);
 
@@ -1116,9 +1117,9 @@ function loop(){
   if(window.__exitWipe) window.__exitWipe.frame(_exitP);   // v3: exit strips — draw AFTER the scene render so #bleed2 samples this fresh frame
   requestAnimationFrame(loop);
 }
-loop();   // runs once, immediately pauses (sceneActive=false until How-it-works is in view)
+if(!isMobile) loop();   // runs once, immediately pauses (sceneActive=false until How-it-works is in view). MOBILE: scene killed → no loop
 // v3: wake the render loop when the How-it-works section enters the viewport, let it self-pause when it leaves (Lusion "render only when visible")
-new IntersectionObserver(es=>es.forEach(e=>{ sceneActive = e.isIntersecting; if(sceneActive && rafPaused){ rafPaused=false; loop(); } }), {rootMargin:'30% 0px 30% 0px'}).observe(processEl);
+if(!isMobile) new IntersectionObserver(es=>es.forEach(e=>{ sceneActive = e.isIntersecting; if(sceneActive && rafPaused){ rafPaused=false; loop(); } }), {rootMargin:'30% 0px 30% 0px'}).observe(processEl);
 </script>
 
 <!-- ===== SITE BODY behaviors: i18n copy swap + compare slider (drawer is Step 2) ===== -->
