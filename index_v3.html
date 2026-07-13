@@ -1932,10 +1932,17 @@ if(IS_COARSE && window.DeviceMotionEvent){
     lastA={x:a.x,y:a.y,z:a.z};
   };
   const enable = ()=>addEventListener('devicemotion', onMotion);
-  if(typeof DeviceMotionEvent.requestPermission==='function'){  // iOS: unlock on the first tap (required user gesture)
-    const ask = ()=>{ removeEventListener('pointerdown', ask); DeviceMotionEvent.requestPermission().then(s=>{ if(s==='granted') enable(); }).catch(()=>{}); };
-    addEventListener('pointerdown', ask);
-  } else enable();                                              // Android: no prompt needed
+  const toastEl=document.getElementById('toast');   // desktop showToast() is inside the !isMobile branch → use #toast directly here
+  const mtoast=(html)=>{ if(!toastEl) return; toastEl.innerHTML=html; toastEl.classList.add('show'); clearTimeout(mtoast._t); mtoast._t=setTimeout(()=>toastEl.classList.remove('show'),4600); };
+  if(typeof DeviceMotionEvent.requestPermission==='function'){  // iOS 13+: per-site prompt, must fire from a user gesture. touchend is honored more reliably than pointerdown; surface the result so a silent denial/error is visible.
+    const ask = ()=>{
+      DeviceMotionEvent.requestPermission().then(s=>{
+        if(s==='granted'){ removeEventListener('touchend', ask); enable(); mtoast('<b>Motion on</b><span class="t-sub">Shake to tumble the letters.</span>'); }
+        else mtoast('<b>Motion blocked</b><span class="t-sub">iOS remembers this — Settings → Safari → Clear History and Website Data, then reload.</span>');
+      }).catch(err=>mtoast('<b>Motion unavailable</b><span class="t-sub">'+((err&&err.message)||err)+'</span>'));
+    };
+    addEventListener('touchend', ask, {passive:true});
+  } else enable();                                              // Android / older iOS: no prompt needed
 }
 }catch(e){ console.warn('topple hero off:', e); }
 </script>
