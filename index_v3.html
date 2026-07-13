@@ -1682,7 +1682,7 @@ function buildFloors(){
 }
 
 const baseMat = new THREE.MeshStandardMaterial({ color:INK, roughness:.42, metalness:.05 });
-const accMat  = new THREE.MeshStandardMaterial({ color:ACC, roughness:.35, metalness:.08 });
+const accMat  = new THREE.MeshStandardMaterial({ color:ACC, emissive:ACC, emissiveIntensity:.6, roughness:.35, metalness:.08 });   // self-lit so cobalt reads vivid on the navy (not muddy)
 const glyphs = [];
 let font = null;
 function highlightSet(s){
@@ -1733,6 +1733,7 @@ function buildGlyphs(){
       }
       if(wi<ln.words.length-1){ x+=spaceW; ci++; }
     });
+    if(li<lines.length-1) ci++;   // count the line-break space too, so ci stays aligned with SENTENCE indices (fixes drifted highlight)
   });
   buildFloors();
 }

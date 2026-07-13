@@ -199,6 +199,7 @@ function buildGlyphs(){
       }
       if(wi<ln.words.length-1){ x+=spaceW; ci++; }
     });
+    if(li<lines.length-1) ci++;   // count the line-break space too, so ci stays aligned with SENTENCE indices (fixes drifted highlight)
   });
   buildFloors();
 }
