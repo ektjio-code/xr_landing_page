@@ -44,6 +44,35 @@ each session.
   strips scrim, squiggle bg, body-motion, focus-cards). If patches don't show, suspect **browser cache /
   stacked servers.**
 
+## Ship polish — kill the "made by AI" tells (audit 2026-07-13)
+The repo is **PUBLIC** and this is a **craft studio's** site — obviously-AI prose in the source/copy undercuts
+the pitch. The code LOGIC / naming (`pmx`,`curF`,`exitP`) / architecture read hand-built (leave them). The tell
+is the **PROSE** — comments + copy. Three to-dos:
+
+1. **Source comments — DONE via build, PENDING deploy-wiring.** `index_v3.html` had **125 em-dashes (—) + 138
+   arrows (→)** in comments plus narrator "explain-the-why" verbosity = textbook AI. Fixed by the strip build
+   (below): `index_v3.min.html` removes ALL comments. ⚠️ NOT live until the `.min` becomes the served entry —
+   pairs with the **retire-`index.html` / line-8-redirect flip** (rename `index_v3.min.html`→`index.html` or
+   point the entry at it). Until then, View-Source / the public repo still expose the notes.
+2. **Copy dashes — DEFERRED launch copy-sweep (separate job).** Em-dashes in USER-VISIBLE text: `strings.js`
+   (~15), the `<title>` **`XRZENO — Scene`** (browser tab — and "Scene" is a leftover; set the real tagline),
+   `Shinobu — whisky bottle`, `Asset 2/3 — title`, and the iOS motion toast `iOS remembers this — Settings → …`.
+   Replace `—` with commas / periods / rewrites. See [[project-dash-sweep-finalization]].
+3. **Copy CADENCE — the subtler tell (do with the sweep).** AI marketing rhythm: the staccato triad
+   `Scan. Rebuild. Deliver.`, balanced antithesis lines, rule-of-N lists (`glass, liquid, label print, packaging
+   texture`). Loosen the rhythm so it reads human, not generated.
+
+### Build — the strip step (added 2026-07-13)
+`index_v3.html` stays the commented working **source** (edit as normal). `npm install` once, then **`npm run
+build`** → **`index_v3.min.html`** at the repo root with every HTML/CSS/JS comment removed via REAL parsers
+(html-minifier-terser → clean-css + terser). **JS compress + mangle are OFF** — comment-removal only, so the
+WebGL/three.js code is behaviourally identical and GLSL shader template-literals / `https` URLs / string literals
+are never touched. Output at root so relative asset paths (`strings.js`, `shinobu.glb`, `Tokonama Scene/`, AR)
+resolve. `node_modules/` gitignored; commit `index_v3.min.html` + `package.json`/lock. **Verify after build:**
+`node --check` each `<script>` in the `.min`; `#version 300 es` / `gl_Position` occurrence counts match the
+source (shaders intact); importmap parses as JSON. (2026-07-13 run: 165KB→112KB, comment em-dashes 125→8, the
+8 remaining = visible copy = job #2 above.)
+
 ---
 
 ## Current state
