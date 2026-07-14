@@ -100,11 +100,11 @@
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
   .card{position:relative;background:var(--bg-deep);border:1px solid var(--hairline);padding:14px 14px 18px;border-radius:14px;box-shadow:0 16px 38px rgba(0,0,0,.42),0 3px 10px rgba(0,0,0,.30)}   /* resting elevation so the plain cards don't sit flat */
   .card img.thumb{display:block;width:100%;aspect-ratio:1/1.05;object-fit:cover;background:var(--bg-deep);border-radius:10px}   /* static product photo card (no 3D viewer) — product shot; AR still via the pill below */
-  /* FOCUS-PULL featured card (Lusion-style still + depth map) */
+  /* FEATURED full-width card — spans the whole row (e.g. the eCommerce demo) */
   .card.featured{grid-column:1/-1}   /* full-width, but otherwise the normal .card box so the frame wraps the image + title + note + button (uniform with the other 2 cards) */
   .card.featured:hover{transform:none}   /* skip the lift/scale on a full-width card (would overflow the row); keep the border/shadow hover */
   .card.featured .fwrap{position:relative;border-radius:10px;overflow:hidden;background:var(--bg-deep)}   /* image rounding only — the .card box now provides the frame + shadow */
-  canvas.fcard{display:block;width:100%;height:auto;background:var(--bg-deep)}
+  .card.featured img.hero{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}   /* full-width featured photo forced to 16:9 (e.g. the shop-demo screenshot) */
   .card h3{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.06em;margin:14px 4px 3px}
   .card p{color:var(--muted);font-size:13.5px;margin:0 4px 14px}
   .card .arb{display:inline-block;color:var(--ink);text-decoration:none;font-size:13.5px;border:1px solid rgba(200,215,255,.30);border-radius:100px;padding:9px 18px;margin:0 4px;background:rgba(255,255,255,.04);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:background .3s,border-color .3s} /* frosted-glass pill, like the "View 3D Model" button */
@@ -293,7 +293,17 @@
     <p class="lede" data-i18n="portfolio.body">Drag to rotate. Open on your phone to place any of these in your space at true size.</p>
     <div class="cards">
       <div class="card featured">
-        <div class="fwrap"><canvas class="fcard" data-img="labubu_park.jpeg" data-depth="labubu_depth.png" data-focus="0.90" aria-label="Labubu plush by PopMart"></canvas></div>
+        <div class="fwrap"><img class="hero" src="XRZENOSHOP.png" alt="XRZENO Shop — eCommerce website demo" loading="lazy"></div>
+        <h3>eCommerce Website Demo</h3>
+        <a class="arb" href="https://ar-shop.xrzeno.com/" target="_blank" rel="noopener noreferrer">Visit Demo</a>
+      </div>
+      <div class="card featured">
+        <div class="fwrap" style="background:#f8f5ef"><img class="hero" src="XRCAFE.png" alt="XR Cafe — restaurant menu demo" loading="lazy" style="object-fit:contain;background:#f8f5ef"></div>
+        <h3>Restaurant Menu Demo</h3>
+        <a class="arb" href="https://xrmenu.xrzeno.com/" target="_blank" rel="noopener noreferrer">Visit Demo</a>
+      </div>
+      <div class="card">
+        <img class="thumb" src="labubu_park.jpeg" alt="Labubu plush by PopMart" loading="lazy">
         <h3>Labubu by PopMart</h3>
         <p>Photogrammetry Reconstruction.</p>
         <a class="arb" href="Labubu3_slim.usdz" data-glb="Labubu3.glb" data-usdz="Labubu3_slim.usdz" data-title="Labubu by PopMart" data-i18n="portfolio.ar">View in your space</a>
@@ -1243,96 +1253,6 @@ new IntersectionObserver(es=>es.forEach(e=>{ sceneActive = e.isIntersecting; if(
     }
     requestAnimationFrame(frame);
   })();
-</script>
-
-<!-- ===== FOCUS-PULL portfolio cards (Lusion recipe: heightfield raymarch + DOF + wobble + knocks on a SecondOrderDynamics spring; multipliers baked at 0.5x per sign-off). Standalone WebGL2, one context per card, runs only while hovered/settling. ===== -->
-<script>
-(function(){
-  const VS=`#version 300 es
-in vec2 aPos;out vec2 vUv;
-void main(){vUv=aPos*0.5+0.5;vUv.y=1.0-vUv.y;gl_Position=vec4(aPos,0.,1.);}`;
-  const FS=`#version 300 es
-precision highp float;
-in vec2 vUv;out vec4 outColor;
-uniform sampler2D uTex,uDepth;
-uniform vec3 uFocus;uniform vec2 uShift;
-uniform float uZoomR,uParallax,uDofMax,uDofOffset,uZoom,uAspect;
-float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
-float lstep(float e0,float e1,float x){return clamp((x-e0)/(e1-e0),0.,1.);}
-void main(){
-  const int PS=12; const int BS=6; const float RELIEF=0.15;
-  float A=uAspect;
-  vec2 uv0=0.5+(vUv-0.5)/uZoom*mix(0.975,1.0,clamp(uZoomR,0.,1.));
-  vec3 pos=vec3((uv0-0.5)*vec2(A,1.0),-RELIEF);
-  float camD=mix(10.0,5.0,clamp(uZoomR,0.,1.));
-  vec3 rayOri=vec3(uFocus.xy*uParallax,camD);
-  float dist=length(pos-rayOri); vec3 rayDir=(pos-rayOri)/dist;
-  float skipD=camD/-rayDir.z; float stepD=(dist-skipD)/float(PS);
-  vec3 rp=rayOri+rayDir*(skipD+stepD*hash(gl_FragCoord.xy));
-  for(int i=0;i<PS;i++){ vec2 suv=rp.xy/vec2(A,1.0)+0.5; float h=texture(uDepth,suv).r; if((h-1.0)*RELIEF>rp.z) break; rp+=rayDir*stepD; }
-  vec2 uvP=rp.xy/vec2(A,1.0)+0.5; uvP+=uShift*0.024;
-  float depth=texture(uDepth,uvP).r;
-  float blur=uDofMax*clamp(uZoomR,0.,1.)*lstep(0.0,0.5,abs(depth-uFocus.z)+uDofOffset);
-  vec3 col=vec3(0.0); float ang=6.2831853*hash(gl_FragCoord.xy+17.0);
-  for(int i=0;i<BS;i++){ float r=sqrt((float(i)+0.5)/float(BS))*blur; ang+=10.16640738; col+=texture(uTex,uvP+r*vec2(cos(ang)/A,sin(ang))).rgb; }
-  outColor=vec4(col/float(BS),1.0);
-}`;
-  class SOD{constructor(v,f,z,r){this.k1=z/(Math.PI*f);this.k2=1/((2*Math.PI*f)**2);this.k3=r*z/(2*Math.PI*f);this.x=v.slice();this.y=v.slice();this.yd=v.map(()=>0);}update(dt,t){const k2s=Math.max(this.k2,dt*dt/2+dt*this.k1/2,dt*this.k1);for(let i=0;i<this.y.length;i++){const xd=(t[i]-this.x[i])/dt;this.x[i]=t[i];this.y[i]+=dt*this.yd[i];this.yd[i]+=dt*(t[i]+this.k3*xd-this.y[i]-this.k1*this.yd[i])/k2s;}}}
-  const fit=(x,a,b,c,d)=>c+(d-c)*Math.min(Math.max((x-a)/(b-a),0),1);
-  const KT=[0,0.2,0.3], ki=r=>KT.filter(t=>r>=t).length;
-  const cards=[]; let raf=0,last=0;
-  function tick(now){ const dt=Math.min(Math.max((now-last)/1000,1/240),1/30); last=now; const t=now/1000; let any=false; for(const c of cards){ if(c.awake){ c.step(dt,t); any=true; } } raf = any ? requestAnimationFrame(tick) : 0; }
-  function start(){ if(!raf){ last=performance.now(); raf=requestAnimationFrame(tick); } }
-
-  function mount(canvas){
-    const gl=canvas.getContext('webgl2',{antialias:false,alpha:false});
-    const fallback=()=>{ const im=new Image(); im.src=canvas.dataset.img; im.style.cssText='width:100%;height:auto;display:block'; canvas.replaceWith(im); };
-    if(!gl){ fallback(); return; }
-    function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);return o;}
-    const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,VS));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);gl.useProgram(p);
-    const q=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,q);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
-    const U={};['uTex','uDepth','uFocus','uShift','uZoomR','uParallax','uDofMax','uDofOffset','uZoom','uAspect'].forEach(n=>U[n]=gl.getUniformLocation(p,n));
-    function tex(img,mip){const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);if(mip){gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);}else{gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);}return t;}
-    const load=src=>new Promise(r=>{const im=new Image();im.onload=()=>r(im);im.onerror=()=>r(null);im.src=src;});
-    let A=16/9, imgW=1920, imgH=1080, ready=false;
-    const FOCUS_ON=parseFloat(canvas.dataset.focus||'0.85'), FOCUS_OFF=2.0;
-    const mouse={tx:0,ty:0,inside:false};
-    const fS=new SOD([0,0,FOCUS_OFF],1.0,0.6,2.0), zS=new SOD([0],2.2,0.7,3.0);
-    let hoverR=0,dofR=0; const knT={x:0,y:0},kn={x:0,y:0};
-    const zone=canvas.closest('.fwrap')||canvas.parentElement;
-    function resize(){const dpr=Math.min(devicePixelRatio||1,2);const w=canvas.clientWidth||1;const h=w*(imgH/imgW);canvas.style.height=h+'px';canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);gl.viewport(0,0,canvas.width,canvas.height);}
-    const c={awake:false, step(dt,t){
-      const prev=hoverR; hoverR=Math.min(Math.max(hoverR+4*dt*(mouse.inside?1:-1),0),1); dofR=Math.min(Math.max(dofR+(mouse.inside?0.75:-1)*dt,0),1);
-      if(prev<hoverR){ if(ki(prev)!==ki(hoverR)){const a=Math.random()*6.283,s=fit(hoverR,0,0.6,1,0);knT.x=Math.cos(a)*s;knT.y=Math.sin(a)*s;} if(ki(hoverR)===KT.length){knT.x*=0.5;knT.y*=0.5;} } else {knT.x*=0.95;knT.y*=0.95;}
-      kn.x+=(knT.x-kn.x)*0.2; kn.y+=(knT.y-kn.y)*0.2;
-      let T; if(mouse.inside){const R=fit(hoverR,0,0.3,1,0)*1.05; T=[-(mouse.tx+Math.cos(t*20)*R),-(mouse.ty+Math.sin(t*30)*R),FOCUS_ON];} else {T=[0,0,FOCUS_OFF];}
-      fS.update(dt,T); zS.update(dt,[mouse.inside?1:0]);
-      if(!ready) return;
-      gl.useProgram(p);
-      gl.uniform3f(U.uFocus,fS.y[0],fS.y[1],fS.y[2]); gl.uniform2f(U.uShift,kn.x,kn.y); gl.uniform1f(U.uZoomR,zS.y[0]);
-      gl.uniform1f(U.uParallax,0.5); gl.uniform1f(U.uDofMax,0.005); gl.uniform1f(U.uDofOffset,-0.5*dofR); gl.uniform1f(U.uZoom,1.10); gl.uniform1f(U.uAspect,A);
-      gl.drawArrays(gl.TRIANGLES,0,3);
-      if(!mouse.inside && hoverR<0.0005 && Math.abs(kn.x)<1e-4 && Math.abs(kn.y)<1e-4 && Math.abs(zS.y[0])<1e-3 && Math.abs(fS.yd[0])<1e-3 && Math.abs(fS.yd[1])<1e-3) this.awake=false;
-    }};
-    cards.push(c);
-    function wake(){ c.awake=true; start(); }
-    function pm(e){const r=zone.getBoundingClientRect();mouse.tx=(e.clientX-r.left)/r.width-0.5;mouse.ty=(e.clientY-r.top)/r.height-0.5;}
-    zone.addEventListener('pointerenter',()=>{mouse.inside=true;wake();});
-    zone.addEventListener('pointermove',pm);
-    zone.addEventListener('pointerleave',()=>{mouse.inside=false;mouse.tx=0;mouse.ty=0;wake();});
-    new ResizeObserver(()=>{resize(); if(ready){ c.awake=true; start(); }}).observe(canvas);
-    Promise.all([load(canvas.dataset.img),load(canvas.dataset.depth)]).then(([ph,dp])=>{
-      if(!ph){ return; } if(!dp){ fallback(); return; }
-      imgW=ph.naturalWidth; imgH=ph.naturalHeight; A=imgW/imgH;
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,tex(ph,true));
-      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,tex(dp,false));
-      gl.uniform1i(U.uTex,0); gl.uniform1i(U.uDepth,1);
-      resize(); ready=true; c.step(1/60,performance.now()/1000);   // one static rest frame
-    });
-  }
-  function init(){ document.querySelectorAll('canvas.fcard').forEach(mount); }
-  if(document.readyState!=='loading') init(); else addEventListener('DOMContentLoaded',init);
-})();
 </script>
 
 <!-- ===== Portfolio "View in your space" AR launcher — same Quick Look / Scene Viewer path as the hero launchAR(), but per-card via data-glb / data-usdz. iOS → USDZ Quick Look; Android → Scene Viewer intent (ar.core, page fallback); desktop → hint toast. Only wires cards that declare data-glb, so ASSET_2/3 placeholders stay inert. ===== -->
