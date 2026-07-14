@@ -10,7 +10,6 @@
 <title>XRZENO — Scene</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
 <script src="strings.js"></script>
 
 <style>
@@ -100,12 +99,11 @@
   .cmp .tag.l{left:14px} .cmp .tag.r{right:14px}
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
   .card{position:relative;background:var(--bg-deep);border:1px solid var(--hairline);padding:14px 14px 18px;border-radius:14px;box-shadow:0 16px 38px rgba(0,0,0,.42),0 3px 10px rgba(0,0,0,.30)}   /* resting elevation so the plain cards don't sit flat */
-  .card model-viewer{width:100%;aspect-ratio:1/1.05;background:radial-gradient(80% 90% at 50% 38%,#0f1c3a 0%,var(--bg-deep) 70%);border-radius:10px;overflow:hidden}
+  .card img.thumb{display:block;width:100%;aspect-ratio:1/1.05;object-fit:cover;background:var(--bg-deep);border-radius:10px}   /* static product photo card (no 3D viewer) — product shot; AR still via the pill below */
   /* FOCUS-PULL featured card (Lusion-style still + depth map) */
-  .card.featured{grid-column:1/-1;background:none;border:0;padding:0;box-shadow:none}   /* no card-box shadow; the shadow rides on .fwrap (the image) instead */
-  .card.featured:hover{transform:none;box-shadow:none}
-  .card.featured .fwrap{position:relative;border:1px solid var(--hairline);border-radius:12px;overflow:hidden;background:var(--bg-deep);box-shadow:0 20px 50px rgba(0,0,0,.46),0 4px 12px rgba(0,0,0,.32)}
-  .card.featured h3{margin-top:16px}
+  .card.featured{grid-column:1/-1}   /* full-width, but otherwise the normal .card box so the frame wraps the image + title + note + button (uniform with the other 2 cards) */
+  .card.featured:hover{transform:none}   /* skip the lift/scale on a full-width card (would overflow the row); keep the border/shadow hover */
+  .card.featured .fwrap{position:relative;border-radius:10px;overflow:hidden;background:var(--bg-deep)}   /* image rounding only — the .card box now provides the frame + shadow */
   canvas.fcard{display:block;width:100%;height:auto;background:var(--bg-deep)}
   .card h3{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.06em;margin:14px 4px 3px}
   .card p{color:var(--muted);font-size:13.5px;margin:0 4px 14px}
@@ -301,18 +299,16 @@
         <a class="arb" href="Labubu3_slim.usdz" data-glb="Labubu3.glb" data-usdz="Labubu3_slim.usdz" data-title="Labubu by PopMart" data-i18n="portfolio.ar">View in your space</a>
       </div>
       <div class="card">
-        <model-viewer src="ASSET_2.glb" ios-src="ASSET_2.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
-          exposure="0.9" shadow-intensity="1" alt="Product 2"></model-viewer>
-        <h3>Asset 2 — title</h3>
-        <p>One-line craft note</p>
-        <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
+        <img class="thumb" src="Duke_packaging.png" alt="G.I. Joe Classified Series Duke — retail packaging" loading="lazy">
+        <h3>G.I.JOE Classified Series Duke. By HASBRO</h3>
+        <p>Photogrammetry Reconstruction.</p>
+        <a class="arb" href="Duke2_slim.usdz" data-glb="Duke2.glb" data-usdz="Duke2_slim.usdz" data-title="G.I.JOE Classified Series Duke" data-i18n="portfolio.ar">View in your space</a>
       </div>
       <div class="card">
-        <model-viewer src="ASSET_3.glb" ios-src="ASSET_3.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
-          exposure="0.9" shadow-intensity="1" alt="Product 3"></model-viewer>
-        <h3>Asset 3 — title</h3>
-        <p>One-line craft note</p>
-        <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
+        <img class="thumb" src="Pizza.jpeg" alt="Meat Lovers pizza on a wooden board" loading="lazy">
+        <h3>Meat Lovers Pizza.</h3>
+        <p>Photogrammetry Reconstruction and Polish.</p>
+        <a class="arb" href="Pizza_slim.usdz" data-glb="Pizza.glb" data-usdz="Pizza_slim.usdz" data-title="Meat Lovers Pizza" data-i18n="portfolio.ar">View in your space</a>
       </div>
     </div>
   </div>
@@ -1617,8 +1613,7 @@ try{(function(){
   addEventListener('pointermove', e=>{ gmx=e.clientX; gmy=e.clientY; });
   const R=185, MAXPULL=54;
   const targets=[
-    ...[...document.querySelectorAll('.cards .card:not(.featured)')].map(el=>({el,rad:14,hov:0})),
-    ...[...document.querySelectorAll('.cards .card.featured .fwrap')].map(el=>({el,rad:12,hov:0})),
+    ...[...document.querySelectorAll('.cards .card')].map(el=>({el,rad:14,hov:0})),
     ...[...document.querySelectorAll('#cmp')].map(el=>({el,rad:12,hov:0})),
   ];
   function roundedPts(x,y,w,h,rad,gap){ rad=Math.max(0,Math.min(rad,w/2,h/2)); const out=[];
