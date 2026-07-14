@@ -1275,6 +1275,88 @@ new IntersectionObserver(es=>es.forEach(e=>{ sceneActive = e.isIntersecting; if(
 })();
 </script>
 
+<!-- ===== DESKTOP hover 3D preview for the AR product cards — a live turntable (HORIZONTAL rotation only) fades in over the photo on hover. One shared WebGL context + RoomEnvironment PBR, overlaid on the hovered card's image; GLBs preloaded on idle so the first hover is instant. Touch is untouched (photo + AR pill only). Currently Labubu-only — add 'Duke2.glb'/'Pizza.glb' to ENABLED to roll out. ===== -->
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+(function(){
+  if(matchMedia('(pointer:coarse)').matches) return;             // DESKTOP ONLY
+
+  const ENABLED=new Set(['Labubu3.glb','Duke2.glb','Pizza.glb']);   // all three AR product cards
+  const cards=[...document.querySelectorAll('.cards .card')].filter(c=>{
+    const a=c.querySelector('.arb[data-glb]'); return a && ENABLED.has(a.dataset.glb) && c.querySelector('img.thumb');
+  });
+  if(!cards.length) return;
+
+  const POLAR_DEFAULT=Math.PI*0.46, POLAR_BY={'Pizza.glb':Math.PI*0.30};   // per-model locked elevation (vertical locked → horizontal spin only). Flat pizza wants a high isometric look-down (smaller polar = more top-down)
+  let polar=POLAR_DEFAULT;
+  const SPIN=1.6;                                                 // turntable speed (autoRotate)
+  const urls=[...new Set(cards.map(c=>c.querySelector('.arb[data-glb]').dataset.glb))];
+
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=0.9;
+  const cv=renderer.domElement;
+  cv.style.cssText='position:absolute;border-radius:10px;opacity:0;transition:opacity .35s ease;pointer-events:none;z-index:3;background:radial-gradient(80% 90% at 50% 38%,#0f1c3a 0%,var(--bg-deep) 70%)';
+
+  const scene=new THREE.Scene();
+  const pmrem=new THREE.PMREMGenerator(renderer);
+  scene.environment=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
+  scene.environmentIntensity=0.6;                                 // dim the IBL (main light) — lower = darker on all 3 viewers
+  const key=new THREE.DirectionalLight(0xffffff,0.25); key.position.set(2,3,4); scene.add(key);   // gentle fill only — RoomEnvironment IBL does the soft main lighting (a strong directional read as harsh)
+  const camera=new THREE.PerspectiveCamera(35,1,0.01,100);
+  const controls=new OrbitControls(camera,cv);
+  controls.enableZoom=false; controls.enablePan=false; controls.enableDamping=true; controls.dampingFactor=0.09;
+  controls.autoRotate=true; controls.autoRotateSpeed=SPIN;
+  controls.minPolarAngle=controls.maxPolarAngle=polar;           // lock vertical → horizontal rotation only (elevation set per-model in enter())
+  controls.addEventListener('start',()=>controls.autoRotate=false);
+  controls.addEventListener('end',()=>{ if(active) controls.autoRotate=true; });
+
+  const loader=new GLTFLoader(), cache=new Map();
+  const load=url=>{ if(!cache.has(url)) cache.set(url,new Promise((res,rej)=>loader.load(url,g=>res(g.scene),undefined,rej))); return cache.get(url); };
+
+  let current=null, model=null, raf=0, active=false;
+  const tick=()=>{ raf=active?requestAnimationFrame(tick):0; controls.update(); renderer.render(scene,camera); };
+
+  function fit(obj){
+    const box=new THREE.Box3().setFromObject(obj), c=new THREE.Vector3(), s=new THREE.Vector3();
+    box.getCenter(c); box.getSize(s); obj.position.sub(c);       // centre at origin
+    const r=Math.max(s.x,s.y,s.z)*0.5, d=r/Math.sin((camera.fov*Math.PI/180)/2)*1.15;
+    controls.target.set(0,0,0);
+    camera.position.setFromSphericalCoords(d,polar,Math.PI*0.15);
+    camera.near=d/50; camera.far=d*12; camera.updateProjectionMatrix(); controls.update();
+  }
+
+  async function enter(card){
+    const img=card.querySelector('img.thumb'); if(!img) return;
+    const w=img.offsetWidth, h=img.offsetHeight;
+    cv.style.top=img.offsetTop+'px'; cv.style.left=img.offsetLeft+'px'; cv.style.width=w+'px'; cv.style.height=h+'px';
+    cv.style.pointerEvents='auto';
+    if(cv.parentElement!==card) card.appendChild(cv);
+    renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+    const url=card.querySelector('.arb[data-glb]').dataset.glb; current=url; active=true;
+    polar=POLAR_BY[url]??POLAR_DEFAULT; controls.minPolarAngle=controls.maxPolarAngle=polar;   // raise the camera for flat models (pizza → isometric look-down)
+    let obj; try{ obj=await load(url); }catch(e){ return; }
+    if(current!==url) return;                                    // hovered away while it loaded
+    if(model && model!==obj) scene.remove(model);
+    model=obj; scene.add(model); fit(model);
+    cv.style.opacity='1'; controls.autoRotate=true; if(!raf) tick();
+  }
+  function leave(){ active=false; current=null; cv.style.opacity='0'; cv.style.pointerEvents='none'; }
+
+  cards.forEach(card=>{
+    card.addEventListener('pointerenter',()=>enter(card));
+    card.addEventListener('pointerleave',leave);
+  });
+
+  const preload=()=>urls.forEach(load);                          // warm the GLBs so the first hover is instant
+  ('requestIdleCallback' in window)?requestIdleCallback(preload,{timeout:3000}):setTimeout(preload,1500);
+})();
+</script>
+
 <!-- ===== STRIPS PRINT PASS (variant B) — the white hero scrim, eaten strip-by-strip on scroll to reveal the blue squiggle site. WebGL2; static-hash front = pure function of scroll → scrub-reversible. Lifted from xrzeno-bleed-transition-demo-v2.html. ===== -->
 <script>
 try{(function(){
