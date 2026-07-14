@@ -33,14 +33,14 @@
   #drawerCtl:hover{letter-spacing:.34em}
   #drawerCtl .chev{display:inline-block;border:solid #ff8a3d;border-width:0 2px 2px 0;padding:3px;transform:rotate(45deg) translateY(-2px);transition:transform .25s}
   #drawerCtl[aria-expanded="true"] .chev{transform:rotate(-135deg) translateY(-2px)}
-  #drawer{position:fixed;top:0;left:0;z-index:99;height:100vh;width:min(280px,84vw);background:rgba(18,34,82,.42);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-right:1px solid rgba(120,150,255,.28);padding:84px 30px 30px;display:flex;flex-direction:column;gap:4px;transform:translateX(-102%);transition:transform .35s cubic-bezier(.3,.9,.3,1)} /* frosted BLUE pane — glass like the buttons, blue-hued */
+  #drawer{position:fixed;top:0;left:0;z-index:99;height:100vh;height:100dvh;width:min(280px,84vw);background:rgba(18,34,82,.42);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-right:1px solid rgba(120,150,255,.28);padding:84px 30px 30px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;transform:translateX(-102%);transition:transform .35s cubic-bezier(.3,.9,.3,1)} /* frosted BLUE pane — glass like the buttons, blue-hued. 100dvh (not 100vh) so the bottom WhatsApp button isn't hidden behind mobile browser UI; overflow-y:auto as a safety on short screens */
   #drawer.open{transform:translateX(0)}
   #drawer a{color:#eaf1ff;text-decoration:none;font-family:'Montserrat',system-ui,sans-serif;font-weight:700;font-size:16px;letter-spacing:.05em;padding:9px 0;border-bottom:1px solid rgba(150,180,255,.14);transition:color .2s}
   #drawer a:hover{color:#ff8a3d}
   #drawer .d-wa{background:#ff8a3d;color:#1a0e04;border:1px solid #ff8a3d;border-bottom:1px solid #ff8a3d;border-radius:100px;text-align:center;padding:13px;font-size:14px;transition:background .3s,color .3s} /* SAME as the bottom-of-page CTA (.btn-wa): solid warm pill */
   #drawer .d-wa:hover{background:transparent;color:#ff8a3d}
   #drawer .d-lang{font-size:12px;color:#93a4c7;letter-spacing:.14em;text-transform:uppercase;border-bottom:0}
-  #drawer .d-social{margin-top:auto;display:flex;gap:20px;align-items:center;padding:18px 0 10px}
+  #drawer .d-social{margin-top:auto;display:flex;gap:20px;align-items:center;justify-content:center;padding:18px 0 10px}
   #drawer .d-social a{border-bottom:0;padding:0;color:#93a4c7;display:inline-flex}
   #drawer .d-social a:hover{color:#ff8a3d}
   #drawer .d-social svg{width:22px;height:22px;fill:currentColor;display:block}
@@ -198,6 +198,10 @@
     opacity:0;transition:opacity .5s ease;text-shadow:0 2px 12px rgba(0,0,0,.6)}   /* mobile "scroll to continue" cue on the Shinobu scene */
   #glmHint.show{opacity:1;animation:introPulse 2.6s ease-in-out infinite}
   @media (pointer:coarse){ #glmHint{display:block} }
+  #glmAR{display:none;position:fixed;left:50%;bottom:13%;transform:translateX(-50%) translateY(12px);z-index:7;opacity:0;pointer-events:none;transition:opacity .6s,transform .6s}   /* mobile Shinobu scene: AR pill (like the tokonoma #ar), revealed once the bottle fully materializes */
+  #glmAR.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+  #glmAR button{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.30);padding:14px 30px;border-radius:100px;font-size:15px;font-weight:600;letter-spacing:.02em;cursor:pointer;font-family:inherit;-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);box-shadow:0 8px 30px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.35)}
+  @media (pointer:coarse){ #glmAR{display:block} }
   #bleed2{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none;display:none}   /* v3: EXIT strips scrim — Method-A shader ABOVE #gl (z5>z4). Samples the live scene + eats it → reveals the site. #gl fades to 0 during the exit so eaten columns show the DOM below. */
   #fx{position:fixed;inset:0;width:100vw;height:100vh;z-index:5;pointer-events:none}   /* v3: emissive card-frame bloom — additive glow lines above #gl, drawn only where a card is hover-lit / magnetized (else fully transparent) */
   #coolVeil,#hint{display:none!important}   /* v3: #ar ("View in 3D") is un-hidden — it's the already-wired inspect pill, shown at the bottom of the fullscreen scene */
@@ -262,6 +266,7 @@
 <canvas id="liquidBg" aria-hidden="true"></canvas>
 <canvas id="glm" aria-hidden="true"></canvas><!-- v3 MOBILE How-it-works: art-directed Shinobu materialize (ported from old index.html), scroll-driven -->
 <div id="glmHint" aria-hidden="true">Scroll to continue ↓</div><!-- mobile: cue on the Shinobu scene, on while it plays, off once the exit transition starts -->
+<div id="glmAR" aria-hidden="true"><button type="button">View In Your Space</button></div><!-- mobile Shinobu scene: AR CTA (shinobu_2k_ar.glb/.usdz), revealed after full materialize -->
 <div id="toppleCursor" aria-hidden="true"></div>
 <div id="rotateGate"><span>↻&ensp;Please rotate your device to portrait</span></div>
 <!-- ===== SITE BODY (concept skeleton) — living liquid backdrop; content flies in over it ===== -->
@@ -1986,7 +1991,7 @@ const [{GLTFLoader},{MeshSurfaceSampler},{EffectComposer},{RenderPass},{UnrealBl
   import('three/addons/postprocessing/OutputPass.js'),
   import('three/addons/environments/RoomEnvironment.js') ]);
 
-const cv=document.getElementById('glm'), processEl=document.getElementById('process'), sceneWindowEl=document.getElementById('sceneWindow'), glmHintEl=document.getElementById('glmHint');
+const cv=document.getElementById('glm'), processEl=document.getElementById('process'), sceneWindowEl=document.getElementById('sceneWindow'), glmHintEl=document.getElementById('glmHint'), glmAREl=document.getElementById('glmAR');
 let W=innerWidth, H=innerHeight;
 const renderer=new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
@@ -2116,14 +2121,27 @@ function loop(){
   else if(cv.style.opacity!=='1') cv.style.opacity='1';              // scrolled back out of the exit → hand the scene back
   window.__pauseLiquid = (winExpand>0.99 && exitP<=0.001);           // opt: freeze the occluded scan-field only while the scene FULLY covers the screen (not while windowed in the card, not during the exit reveal)
   if(glmHintEl) glmHintEl.classList.toggle('show', exitP<0.001);      // "scroll to continue" — on while the scene plays, off the instant the exit transition begins
+  if(glmAREl) glmAREl.classList.toggle('show', curF>0.98 && exitP<0.001);   // "View In Your Space" AR pill — only once the bottle has fully materialized, hidden as the exit starts
   if(window.__exitWipe) window.__exitWipe.frame(exitP);              // MUST be right after composer.render() → the #glm drawing buffer is still valid to sample
   requestAnimationFrame(loop);
 }
 addEventListener('resize',()=>{ W=innerWidth;H=innerHeight; renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix(); composer.setSize(W,H); });
 new IntersectionObserver(es=>es.forEach(e=>{ active=e.isIntersecting;
   if(active){ cv.style.opacity='1'; if(!raf){ raf=true; loop(); } }
-  else { cv.style.opacity='0'; window.__pauseLiquid=false; if(glmHintEl) glmHintEl.classList.remove('show'); if(window.__exitWipe) window.__exitWipe.hide(); }   // leaving How-it-works → hand the live scan-field back, hide the scene + cue + retract the exit scrim
+  else { cv.style.opacity='0'; window.__pauseLiquid=false; if(glmHintEl) glmHintEl.classList.remove('show'); if(glmAREl) glmAREl.classList.remove('show'); if(window.__exitWipe) window.__exitWipe.hide(); }   // leaving How-it-works → hand the live scan-field back, hide the scene + cue + retract the exit scrim
 }),{rootMargin:'0px'}).observe(processEl);
+
+// "View In Your Space" → Shinobu AR (same Quick Look / Scene Viewer path as the hero/portfolio): iOS → shinobu_2k_ar.usdz, Android → shinobu_2k_ar.glb via Scene Viewer.
+if(glmAREl){
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const isAndroid=/android/i.test(navigator.userAgent);
+  const base=location.href.split(/[?#]/)[0].replace(/[^/]*$/,'');
+  glmAREl.querySelector('button').addEventListener('click',()=>{
+    if(isIOS){ const a=document.createElement('a'); a.setAttribute('rel','ar'); a.appendChild(document.createElement('img')); a.href=base+'shinobu_2k_ar.usdz'; a.click(); }
+    else if(isAndroid){ const g=encodeURIComponent(base+'shinobu_2k_ar.glb'), fb=encodeURIComponent(location.href);
+      location.href='intent://arvr.google.com/scene-viewer/1.0?file='+g+'&mode=ar_only&title='+encodeURIComponent('XRZENO — Shinobu')+'#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url='+fb+';end;'; }
+  });
+}
 
 // ===== TURNTABLE: horizontal drag spins the bottle around Y; vertical stays native scroll. Axis is locked on the first significant move so a vertical fling never spins it, and a horizontal spin never scrolls. Active only while the scene is on-screen. =====
 const ROT_SENS=0.008;   // radians per px (eyeball knob)
