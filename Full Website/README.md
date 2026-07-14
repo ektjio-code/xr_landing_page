@@ -77,6 +77,43 @@ source (shaders intact); importmap parses as JSON. (2026-07-13 run: 165KB→112K
 
 ## Current state
 
+### Session 2026-07-14 — portfolio rebuilt (real assets), desktop hover-3D, drawer + mobile-AR fixes, USDZ compressor fix
+**Compare "Real vs Render" (`#cmp`) — DONE, real images.** Ed used **Shinobu** after all: photo `Shinobu studio
+shot.jpeg` + `shinobu_edited.jpeg` (a render he HAND-ALIGNED to the photo). Placeholder gradients gone. Web assets
+`compare-photo.jpg`/`compare-render.jpg` are built by a Pillow script: detect the dark-bronze body bbox, scale onto a
+common 1600×1000 (16:10) canvas, **base pinned** (~5% floor). For the hand-aligned render I applied the PHOTO's exact
+transform (not re-detected) so his overlap survives → tight registration.
+
+**Portfolio (`#portfolio`) — fully rebuilt, NO inline 3D viewers (Ed's rule).** `<model-viewer>` + its CDN import
+removed. 5 cards:
+- **eCommerce Website Demo** + **Restaurant Menu Demo** — full-width `.card.featured` **16:9 photo** cards
+  (`XRZENOSHOP.png` / `XRCAFE.png`), button **"Visit Demo"** → external links (`ar-shop.` / `xrmenu.xrzeno.com`),
+  plain `<a>` (no `data-glb`). XRCAFE is a wide cream logo → `object-fit:contain` on `#f8f5ef` (blends the letterbox).
+- **Labubu / Duke / Pizza** — static product photos (`img.thumb`) + **"View in your space"** AR pill, wired by a
+  per-card launcher (`.arb[data-glb]`: iOS Quick Look usdz / Android Scene Viewer glb / desktop toast).
+- Featured-card frame unified to wrap image+text+button. **Fake-depth/focus-pull REMOVED** (Labubu was briefly a
+  `canvas.fcard` + synthesized `labubu_depth.png`; Ed: "lose it for uniformity" — script + CSS + png deleted).
+
+**DESKTOP hover-3D preview (new, `<script type=module>` after the AR launcher).** Hovering an AR card fades a live
+Three.js **turntable** in over the photo — HORIZONTAL only (polar locked), drag-to-spin, RoomEnvironment PBR, ONE
+shared WebGL context, GLBs **preloaded on idle**. `matchMedia('(pointer:coarse)')`-gated → desktop only. Per-model
+elevation `POLAR_BY`: Pizza gets a raised isometric look-down (flat model). Soft light: `environmentIntensity 0.6`,
+exposure 0.9, directional 0.25. Knobs: `SPIN`, `POLAR`, the `ENABLED` set.
+
+**Drawer.** Social icons **centered** (`justify-content:center`). WhatsApp CTA was clipped on mobile because `#drawer`
+was `100vh` (counts the area behind the mobile browser UI) → now `100dvh` + `overflow-y:auto`.
+
+**Mobile Shinobu scene — "View In Your Space" AR.** After full materialize (`curF>0.98`), a frosted pill (like the
+tokonoma `#ar`) fades in and launches **`shinobu_2k_ar.glb/.usdz`** (iOS Quick Look / Android Scene Viewer); hidden on
+exit-wipe / section leave. Inside the coarse-pointer-gated scene script.
+
+**USDZ compressor bug FIXED (`D:\WORK STUFF\Blender Workflow\compress_usdz.py`).** Symptom: Pizza's glossy cheese
+rendered **black in AR** on the `*_slim.usdz` only. Cause: a texture **shared by two materials** was converted+deleted
+for the first, the second material's ref was then skipped (file gone) → **dangling reference** after flatten → missing
+diffuse → black. Fix: convert each physical texture once (dedupe) + rewrite **all** refs via `UsdUtils.ModifyAssetPaths`
+BEFORE flatten (flatten KEPT — it's the mesh-compression win; Labubu output byte-identical). `Pizza_slim.usdz`
+re-slimmed, verified 0 dangling refs (10.4→4.9 MB). ⚠️ Re-run the `.bat` on any other multi-material USDZ slimmed earlier.
+
 ### Desktop v3 — the new front door (`index_v3.html`, ACTIVE, updated 2026-07-11)
 Built off a copy of v2. The tokonoma/shinobu cinematic is DROPPED from the initial view (scene still loads +
 compiles up front — feeds the load bar) and is now **re-homed as the "How it works" section** (see below).
@@ -218,10 +255,15 @@ EXCEPT shake/tilt. `?stay` is REQUIRED everywhere — line 8 redirects phones to
 1. ✅ **Ported v3 to MOBILE (2026-07-13)** — full responsive port; see "Mobile v3" above (Shinobu How-it-works,
    turntable, tilt bg, shake, jank/overflow fixes). REMAINING: flip the line-8 device redirect → retire
    `index.html`; featured-card `.fcard` depth-canvas → plain `<img>` on mobile (Ed OK'd, not built).
-2. **Real assets (Ed inputs):** portfolio GLB/USDZ for cards 2 & 3 (card 1 = bottle); the real photo+render
-   pair for the compare slider (SAME angle/framing or the trick dies — currently placeholder gradients);
-   real social handles for the 5 drawer icons (`instagram.com/xrzeno` etc. are placeholders).
-3. **Copy dash-sweep at finalization** — strip AI-dash tells from `strings.js` (EN+ID) + body copy.
+- ✅ Done 2026-07-14: **compare real images** (Shinobu photo + hand-aligned render) · **portfolio fully rebuilt**
+  (2 web-demo cards + 3 product cards, no inline 3D) · **desktop hover-3D turntable** on the AR cards · **drawer**
+  centered-icons + WhatsApp `100dvh` fix · **mobile Shinobu "View In Your Space" AR** · **USDZ compressor bug fixed**
+  (Pizza black-cheese) + `Pizza_slim.usdz` re-slimmed.
+2. **Real assets — DONE** except **real social handles** for the 5 drawer icons (`instagram.com/xrzeno` etc. are
+   still placeholders).
+3. **▶ TOMORROW (2026-07-14 EOD hand-off): COPYWRITING** — the launch copy dash-sweep + real copy. Strip AI-dash
+   tells from `strings.js` (EN+ID) + body copy; set the real `<title>` (currently `XRZENO — Scene`, "Scene" is a
+   leftover); fix the portfolio/compare/toast copy. See [[project-dash-sweep-finalization]].
 - **Parked (Ed, revisit):** the scene-card opacity "still out of place" per Ed — he made it opaque but wasn't
   100% happy; nail down exactly what's off when he flags it. Also floated but not built: warping the *photo*
   inside a frame WITH the magnet (SVG `feDisplacementMap` for flat photos / vertex warp on the WebGL focus-pull
