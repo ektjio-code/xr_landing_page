@@ -10,3 +10,6 @@ Backup/
 # Claude Code local + temp files
 .claude/settings.local.json
 .claude/*.tmp*
+
+# build tooling
+node_modules/
