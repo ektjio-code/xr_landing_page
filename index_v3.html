@@ -295,10 +295,10 @@
     <p class="lede" data-i18n="portfolio.body">Drag to rotate. Open on your phone to place any of these in your space at true size.</p>
     <div class="cards">
       <div class="card featured">
-        <div class="fwrap"><canvas class="fcard" data-img="shinobu.png" data-depth="shinobu_depth.png" data-focus="0.88" aria-label="Shinobu whisky bottle"></canvas></div>
-        <h3>Shinobu — whisky bottle</h3>
-        <p>Photogrammetry · glass + label rebuild</p>
-        <a class="arb" href="#" data-i18n="portfolio.ar">View in your space</a>
+        <div class="fwrap"><canvas class="fcard" data-img="labubu_park.jpeg" data-depth="labubu_depth.png" data-focus="0.90" aria-label="Labubu plush by PopMart"></canvas></div>
+        <h3>Labubu by PopMart</h3>
+        <p>Photogrammetry Reconstruction.</p>
+        <a class="arb" href="Labubu3_slim.usdz" data-glb="Labubu3.glb" data-usdz="Labubu3_slim.usdz" data-title="Labubu by PopMart" data-i18n="portfolio.ar">View in your space</a>
       </div>
       <div class="card">
         <model-viewer src="ASSET_2.glb" ios-src="ASSET_2.usdz" camera-controls ar ar-modes="webxr scene-viewer quick-look"
@@ -1336,6 +1336,26 @@ void main(){
   }
   function init(){ document.querySelectorAll('canvas.fcard').forEach(mount); }
   if(document.readyState!=='loading') init(); else addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+<!-- ===== Portfolio "View in your space" AR launcher — same Quick Look / Scene Viewer path as the hero launchAR(), but per-card via data-glb / data-usdz. iOS → USDZ Quick Look; Android → Scene Viewer intent (ar.core, page fallback); desktop → hint toast. Only wires cards that declare data-glb, so ASSET_2/3 placeholders stay inert. ===== -->
+<script>
+(function(){
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const isAndroid=/android/i.test(navigator.userAgent);
+  const baseURL=location.href.split(/[?#]/)[0].replace(/[^/]*$/,'');
+  function toast(html){ const t=document.getElementById('toast'); if(!t){ return; }
+    t.innerHTML=html; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),4200); }
+  document.querySelectorAll('.arb[data-glb]').forEach(a=>{
+    a.addEventListener('click',e=>{ e.preventDefault();
+      const glb=a.dataset.glb, usdz=a.dataset.usdz||'', title=a.dataset.title||'XRZENO';
+      if(isIOS && usdz){ const l=document.createElement('a'); l.setAttribute('rel','ar'); l.appendChild(document.createElement('img')); l.href=baseURL+usdz; l.click(); }
+      else if(isAndroid){ const g=encodeURIComponent(baseURL+glb), fb=encodeURIComponent(location.href);
+        location.href='intent://arvr.google.com/scene-viewer/1.0?file='+g+'&mode=ar_only&title='+encodeURIComponent(title)+'#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url='+fb+';end;'; }
+      else { toast('<b>View on mobile for AR</b><span class="t-sub">Open this page on your iOS or Android phone to place it in your space.</span>'); }
+    });
+  });
 })();
 </script>
 
