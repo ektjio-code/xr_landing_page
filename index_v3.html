@@ -1838,7 +1838,7 @@ const FONT_URL = 'montserrat_semibold.typeface.json';
 const SENTENCE = "We create 3D visual and interactive eXpeRiences that put your products in customers' hands";
 const K = { grav:1400, drop:200, hold:1, knock:1, rest:.2, shr:110, shd:34, spr:150, size:56 };
 const IS_COARSE = matchMedia('(pointer:coarse)').matches;   // mobile branch: smaller font, raised floor, touch = cursor
-const INK=0xeaf1ff, ACC=0x1e40ff;   // site palette (colour tuning deferred)
+const INK=0xffffff, ACC=0x1e40ff;   // base letters pure white (read white, not grey, on the dark navy hero bg); ACC = cobalt accent
 
 const canvas = document.getElementById('toppleGl');
 const cursorEl = document.getElementById('toppleCursor');
@@ -1854,9 +1854,10 @@ const camera = new THREE.PerspectiveCamera(FOV, W/H, 1, 6000);
 const camDist = ()=> (H/2)/Math.tan(THREE.MathUtils.degToRad(FOV)/2);
 function placeCamera(){ camera.position.set(0,0,camDist()); camera.lookAt(0,0,0); camera.aspect=W/H; camera.updateProjectionMatrix(); }
 
-scene.add(new THREE.AmbientLight(0xffffff,.72));
+scene.add(new THREE.AmbientLight(0xffffff,.85));
 const kl = new THREE.DirectionalLight(0xffffff,1.15); kl.position.set(-200,320,500); scene.add(kl);
 const rl = new THREE.DirectionalLight(0x9db0ff,.5); rl.position.set(260,-120,240); scene.add(rl);
+const fill = new THREE.DirectionalLight(0xffffff,.6); fill.position.set(0,40,600); scene.add(fill);   // v3: front fill so the camera-facing letter faces read WHITE (not grey); key + rim still shape the bevels for form
 
 const sx2w = x => x - W/2;
 const sy2w = y => -(y - H/2);
