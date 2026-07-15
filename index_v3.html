@@ -318,7 +318,7 @@
 <nav id="drawer" aria-label="Site navigation">
   <a href="#portfolio" data-nav="portfolio" data-i18n="drawer.portfolio">Portfolio</a>
   <a href="#benefits"  data-nav="benefits"  data-i18n="drawer.benefits">Benefits</a>
-  <a href="#process"   data-nav="process"   data-i18n="drawer.process">How it works</a>
+  <a href="#howwework" data-nav="howwework" data-i18n="drawer.process">How it works</a>
   <a href="#faq"       data-nav="faq"        data-i18n="drawer.faq">FAQ</a>
   <a href="#contact"   data-nav="contact"    data-i18n="drawer.contact">Contact</a>
   <a href="#" class="d-lang" id="langToggle" data-i18n="drawer.lang">Bahasa Indonesia</a>
@@ -565,7 +565,9 @@ if(introEl){
 if(isMobile){
   if(cv) cv.style.display='none';
   introFinish();                                                                                          // resolve the load gate on the min-duration clock
-  window.__nav = (id)=>{ const t=document.getElementById(id); if(t) t.scrollIntoView({behavior:'smooth', block:'start'}); };   // drawer nav still needs this on mobile
+  window.__nav = (id)=>{
+    if(id==='benefits'){ const p=document.getElementById('process'); if(p){ const top=p.getBoundingClientRect().top+scrollY, sc=Math.max(0,p.offsetHeight-innerHeight); scrollTo({top:top+sc, behavior:'smooth'}); } return; }   // The Payoff is pinned/revealed at the END of the scene runway — scroll there, not to its pulled-up DOM position
+    const t=document.getElementById(id); if(t) t.scrollIntoView({behavior:'smooth', block:'start'}); };   // drawer nav still needs this on mobile
   addEventListener('scroll', ()=>{ if(introDone) introEl.style.opacity = String(1 - Math.min(1, scrollY/(innerHeight*0.18))); }, {passive:true});   // fade the white #intro out on scroll — desktop does this in its render loop (now gated off on mobile), so without it the intro stayed opaque over the page and froze the view
 } else {
 
@@ -1147,7 +1149,9 @@ arBtn.addEventListener('click', ()=> inspectMode ? exitInspect() : enterInspect(
 const RAMP = ()=> innerHeight*0.9;                       // bodyP ramp length (must match the bodyP formula + the #release height)
 let bodyLocked = false, rafPaused = false, sceneActive = false;   // v3: scroll-lock removed; sceneActive gates the render loop to the #process (How-it-works) section
 // v3: drawer nav → plain native smooth-scroll to the section (body is normal in-flow DOM now)
-window.__nav = (id)=>{ const t=document.getElementById(id); if(t) t.scrollIntoView({behavior:'smooth', block:'start'}); };
+window.__nav = (id)=>{
+  if(id==='benefits'){ const p=document.getElementById('process'); if(p){ const top=p.getBoundingClientRect().top+scrollY, sc=Math.max(0,p.offsetHeight-innerHeight); scrollTo({top:top+sc, behavior:'smooth'}); } return; }   // The Payoff is pinned/revealed at the END of the scene runway — scroll there, not to its pulled-up DOM position
+  const t=document.getElementById(id); if(t) t.scrollIntoView({behavior:'smooth', block:'start'}); };
 // v3: the white loading hero fades over the first slice of scroll (reversible); the strips scrim carries the identical white+XRZENO, so it's a seamless handoff. Passive → never gates scroll.
 addEventListener('scroll', ()=>{ if(introDone) introEl.style.opacity = String(1 - Math.min(1, scrollY/(innerHeight*0.18))); }, {passive:true});
 
