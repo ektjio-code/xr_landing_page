@@ -77,6 +77,46 @@ source (shaders intact); importmap parses as JSON. (2026-07-13 run: 165KB→112K
 
 ## Current state
 
+### Session 2026-07-15 — SEO infra, copy sweep, new content sections, section reorder, About drawer, footer
+Content-fill + polish pass on `index_v3.html` + `strings.js` (both languages). All committed + pushed.
+- **SEO / share infra (in `<head>`):** GA4 `G-DH5EJKW9N7` (shared with the live site), meta description/robots/canonical,
+  favicon + apple-touch-icon (`logo_xrzeno.png`), Open Graph + Twitter cards, JSON-LD `LocalBusiness` + `FAQPage`.
+  `og:image` points at the live `https://xrzeno.com/assets/images/xrzeno_og_image.png` (swap for a v3-specific one later).
+- **Copy AI-tell sweep:** em-dashes/arrows stripped from ALL visible copy (EN+ID); `<title>` = just `XRZENO`; iOS toast +
+  Android AR-viewer titles cleaned. Cadence: rewrote `howwework.title`, `about.p1`, `portfolio.body`; left `cta.title`
+  ("Show your product, not a picture of it") + `howwework.step1` per Ed. **`process.*` strings are now orphaned + DELETED**
+  (only `process.eyebrow` renders) — that killed the dead `Scan. Rebuild. Deliver.` triad + rule-of-4 list.
+- **Real social handles** (from the live footer): IG `xrzeno.ar`, TikTok `@xrzeno.ar`, FB `61576647629594`, X `xrzeno`,
+  **+ YouTube `@hello.xrzeno`** (6th icon). Threads `@xrzeno` KEPT but UNVERIFIED (not on the live site).
+- **New TEXT sections (reused `.steps` pattern, no new CSS/JS, inherit the reveal motion):**
+  **"How it works"** now = eyebrow + `howwework.title` + 4 numbered steps (Discuss / Scan / Build / Deliver) in a `#howwework`
+  lead block, THEN the tokonoma scene (`#process`, eyebrow removed so it reads as one section). Steps are a SEPARATE section
+  before `#process` on purpose — text inside `#process` would eat the scene's scroll runway (`min-height:440vh`,
+  `scrollProgress` = `-top/(height-innerHeight)`) and skip its opening beats.
+  **"The Payoff"** (`#benefits`, eyebrow "The payoff") = 3 benefit steps (They trade up / No surprises / It spreads),
+  ported+generalized from the old site's ROI section, rewritten in the site voice.
+- **Section reorder:** Portfolio → How it works (steps + scene) → **The Payoff** → FAQ → Contact. The scene's exit-wipe now
+  **reveals The Payoff** in place: the pin was reassigned CSS-only `#faqReveal>#faq` → `#faqReveal>#benefits`; **FAQ is
+  unpinned** to normal flow after. (Whole reveal is pure CSS — no JS touches `#faqReveal`.)
+- **Drawer nav fixes (post-reorder):** "How it works" → `#howwework`; **"Benefits" special-cased in BOTH `__nav` defs**
+  (desktop + mobile) to scroll to the END of the scene runway where the wipe reveals the pinned Payoff (its DOM position is
+  pulled up 240vh by the reveal wrapper, so `scrollIntoView` lands mid-scene).
+- **About = drawer accordion (Ed's design):** new "About" item after Contact; click EXPANDS an inline `#aboutPanel` (chevron
+  flips, drawer stays open). 3 short paragraphs cleaned+generalized from the live `/about`. EN+ID. CSS: `#drawer .d-about`
+  max-height transition; JS toggle next to the drawer handlers.
+- **Footer build-out:** bare 1-line strip → 4 flex-wrap blocks: brand+tagline · Studio (location + hours) · Contact
+  (email + WhatsApp text links) · Privacy + `© 2026 XRZENO`. All text/links, no new buttons/images.
+- **Tumble hero:** base letters `INK` → pure white + a **front fill light** so faces read white not grey. **Accent bloom was
+  TRIED + REVERTED** — `UnrealBloomPass` thresholds on luminance (can't isolate the low-luminance blue accents) AND broke the
+  transparent-canvas background (opaque black). Real fix would be selective/layer bloom (parked). Shadow (#5) was rejected:
+  the hero bg is dark navy `#0a1633`, a dark contact shadow can't read on near-black. Leave the tumble alone for now (Ed).
+- **Cache gotcha fixed:** `strings.js` is now loaded as **`strings.js?v=2`** — a plain reload re-fetches the HTML but reuses a
+  cached `strings.js`, which kept showing stale copy (cost a round-trip debugging a "phantom" em-dash). **Bump the `?v=`
+  whenever you edit `strings.js`.** (Verify served content with `curl`, don't trust the browser.)
+- ⚠️ **STILL THE KEY DEPLOY BLOCKER:** the **line-8 device redirect still sends phones to `index.html`** (the old legacy
+  mobile) unless `?stay`. v3 is the responsive file, but real phones won't see it until that redirect is flipped/removed.
+  Retire `index.html` at the same time. Not done this session.
+
 ### Session 2026-07-14 — portfolio rebuilt (real assets), desktop hover-3D, drawer + mobile-AR fixes, USDZ compressor fix
 **Compare "Real vs Render" (`#cmp`) — DONE, real images.** Ed used **Shinobu** after all: photo `Shinobu studio
 shot.jpeg` + `shinobu_edited.jpeg` (a render he HAND-ALIGNED to the photo). Placeholder gradients gone. Web assets

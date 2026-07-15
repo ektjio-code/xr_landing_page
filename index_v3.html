@@ -90,7 +90,7 @@
 
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
-<script src="strings.js"></script>
+<script src="strings.js?v=2"></script>
 
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
@@ -124,6 +124,13 @@
   #drawer .d-social a{border-bottom:0;padding:0;color:#93a4c7;display:inline-flex}
   #drawer .d-social a:hover{color:#ff8a3d}
   #drawer .d-social svg{width:22px;height:22px;fill:currentColor;display:block}
+  #drawer .d-about-toggle{display:flex;align-items:center;justify-content:space-between}
+  #drawer .d-about-toggle::after{content:'';border:solid currentColor;border-width:0 2px 2px 0;padding:3px;transform:rotate(45deg) translateY(-1px);transition:transform .3s;opacity:.65}
+  #drawer .d-about-toggle[aria-expanded="true"]::after{transform:rotate(-135deg) translateY(1px)}
+  #drawer .d-about{max-height:0;overflow:hidden;transition:max-height .45s cubic-bezier(.3,.9,.3,1)}   /* expands inside the drawer on About click */
+  #drawer .d-about.open{max-height:60vh}
+  #drawer .d-about p{color:#93a4c7;font-family:system-ui,sans-serif;font-weight:400;font-size:13.5px;line-height:1.65;letter-spacing:0;text-transform:none;padding:9px 0 0}
+  #drawer .d-about p:first-child{padding-top:12px}
   #scrim{position:fixed;inset:0;z-index:98;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s}
   #scrim.on{opacity:1;pointer-events:auto}
   #ar{position:fixed;z-index:30;bottom:9%;left:50%;transform:translateX(-50%) translateY(12px);opacity:0;transition:opacity .6s,transform .6s;pointer-events:none}
@@ -209,9 +216,11 @@
   .btn-wa:hover{background:transparent;color:var(--warm)}
   .btn-mail{background:rgba(255,255,255,.04);color:var(--ink);border:1px solid rgba(200,215,255,.30);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)} /* frosted-glass pill, like the "View 3D Model" button */
   .btn-mail:hover{background:rgba(200,215,255,.12);border-color:rgba(200,215,255,.55)}
-  footer{position:relative;z-index:2;background:transparent;border-top:1px solid var(--hairline);padding:34px 6vw;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
+  footer{position:relative;z-index:2;background:transparent;border-top:1px solid var(--hairline);padding:48px 6vw 36px;display:flex;justify-content:space-between;align-items:flex-start;gap:30px 48px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
   footer a{color:var(--muted);text-decoration:none} footer a:hover{color:var(--accent)}
   footer .fb{font-family:var(--disp);font-weight:700;letter-spacing:.28em;color:var(--ink)}
+  footer .fcol{display:flex;flex-direction:column;gap:6px;max-width:250px}
+  footer .fh{font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink);opacity:.6;margin-bottom:2px}
   /* ===== BODY MOTION SYSTEM (Lusion pass): word-assembly + decode headings, scroll-velocity shear, springy staggered reveals, magnetic buttons — one SOD primitive ===== */
   .reveal{opacity:0;transform:translateY(40px) scale(.982);transition:opacity .85s cubic-bezier(.2,.7,.2,1),transform 1s cubic-bezier(.2,1.14,.32,1)}   /* springy overshoot, not a flat fade */
   .reveal.in{opacity:1;transform:none}
@@ -321,6 +330,12 @@
   <a href="#howwework" data-nav="howwework" data-i18n="drawer.process">How it works</a>
   <a href="#faq"       data-nav="faq"        data-i18n="drawer.faq">FAQ</a>
   <a href="#contact"   data-nav="contact"    data-i18n="drawer.contact">Contact</a>
+  <a href="#" class="d-about-toggle" id="aboutToggle" role="button" aria-expanded="false" aria-controls="aboutPanel" data-i18n="drawer.about">About</a>
+  <div class="d-about" id="aboutPanel" role="region" aria-label="About XRZENO">
+    <p data-i18n="about.p1">XRZENO is a WebAR product-visualization studio in Tangerang Selatan, Banten. We started in early 2026 because no one should have to guess what a product looks like from a flat photo.</p>
+    <p data-i18n="about.p2">So we scan real products and rebuild them as accurate 3D models your customers can turn over, and place in their own space at true size, straight from the browser. No app to install.</p>
+    <p data-i18n="about.p3">We build for everyone, from a single shop to a full catalog, and we keep the process quick and the pricing clear.</p>
+  </div>
   <a href="#" class="d-lang" id="langToggle" data-i18n="drawer.lang">Bahasa Indonesia</a>
   <div class="d-social" aria-label="Social links">
     <a href="https://instagram.com/xrzeno.ar" target="_blank" rel="noopener" aria-label="Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163C8.741 0 8.332.014 7.052.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
@@ -377,7 +392,7 @@
   <div class="wrap">
     <div class="eyebrow" data-i18n="portfolio.eyebrow">Portfolio</div>
     <h2 data-i18n="portfolio.title">Built from real products.</h2>
-    <p class="lede" data-i18n="portfolio.body">Drag to rotate. Open on your phone to place any of these in your space at true size.</p>
+    <p class="lede" data-i18n="portfolio.body">Explore the possibilities. View on your phone for the full AR experience.</p>
     <div class="cards">
       <div class="card featured">
         <div class="fwrap"><img class="hero" src="XRZENOSHOP.png" alt="XRZENO Shop, eCommerce website demo" loading="lazy"></div>
@@ -414,7 +429,7 @@
 <section class="sect" id="howwework">
   <div class="wrap">
     <div class="eyebrow" data-i18n="process.eyebrow">How it works</div>
-    <h2 data-i18n="howwework.title">You bring the product. We handle the rest.</h2>
+    <h2 data-i18n="howwework.title">All we need from you is the product.</h2>
     <div class="steps">
       <div class="step">
         <h3 data-i18n="howwework.step1.title">Discuss</h3>
@@ -491,9 +506,24 @@
 </section>
 
 <footer>
-  <span class="fb">XRZENO</span>
-  <span data-i18n="footer.tagline">WebAR & product visualization</span>
-  <span><a href="/privacy" data-i18n="footer.privacy">Privacy</a> · <span data-i18n="footer.rights">© XRZENO</span></span>
+  <div class="fcol">
+    <span class="fb">XRZENO</span>
+    <span data-i18n="footer.tagline">WebAR & product visualization</span>
+  </div>
+  <div class="fcol">
+    <span class="fh" data-i18n="footer.studioLabel">Studio</span>
+    <span data-i18n="footer.location">Tangerang Selatan, Banten, Indonesia</span>
+    <span data-i18n="footer.hours">Mon–Fri, 9am–6pm</span>
+  </div>
+  <div class="fcol">
+    <span class="fh" data-i18n="footer.contactLabel">Contact</span>
+    <a href="mailto:hello@xrzeno.com">hello@xrzeno.com</a>
+    <a href="https://wa.me/6282342736941" target="_blank" rel="noopener" data-i18n="footer.wa">WhatsApp</a>
+  </div>
+  <div class="fcol">
+    <a href="/privacy" data-i18n="footer.privacy">Privacy</a>
+    <span data-i18n="footer.rights">© 2026 XRZENO. All rights reserved.</span>
+  </div>
 </footer>
 </div><!-- /#siteBody -->
 
@@ -1319,6 +1349,8 @@ new IntersectionObserver(es=>es.forEach(e=>{ sceneActive = e.isIntersecting; if(
   addEventListener('keydown', e=>{ if(e.key==='Escape') setDrawer(false); });
   drawer.querySelectorAll('a[data-nav]').forEach(a=> a.addEventListener('click', e=>{ e.preventDefault(); setDrawer(false); if(window.__nav) window.__nav(a.dataset.nav); }));
   const dwa=document.getElementById('drawerWA'); if(dwa) dwa.addEventListener('click', ()=> setDrawer(false));
+  const aboutT=document.getElementById('aboutToggle'), aboutP=document.getElementById('aboutPanel');
+  if(aboutT && aboutP) aboutT.addEventListener('click', e=>{ e.preventDefault(); const open=!aboutP.classList.contains('open'); aboutP.classList.toggle('open',open); aboutT.setAttribute('aria-expanded', open); });   // About extends the drawer in place (does NOT close it)
   const lt=document.getElementById('langToggle'); if(lt) lt.addEventListener('click', e=>{ e.preventDefault(); bodyLang = bodyLang==='en'?'id':'en'; applyLang(); });
 
   // ===== BODY MOTION SYSTEM — turn the DOM body into a living, Lusion-grade page: word-assembly + decode headings, scroll-velocity shear, springy staggered reveals, magnetic buttons — all on one SOD primitive =====

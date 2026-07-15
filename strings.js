@@ -9,8 +9,12 @@ window.XR_STRINGS = {
     "drawer.process": "How it works",
     "drawer.faq": "FAQ",
     "drawer.contact": "Contact",
+    "drawer.about": "About",
     "drawer.whatsapp": "Chat on WhatsApp",
     "drawer.lang": "Bahasa Indonesia",
+    "about.p1": "XRZENO is a WebAR product-visualization studio in Tangerang Selatan, Banten. We started in early 2026 because no one should have to guess what a product looks like from a flat photo.",
+    "about.p2": "So we scan real products and rebuild them as accurate 3D models your customers can turn over, and place in their own space at true size, straight from the browser. No app to install.",
+    "about.p3": "We build for everyone, from a single shop to a full catalog, and we keep the process quick and the pricing clear.",
 
     "compare.eyebrow": "Real vs Render",
     "compare.title": "One of these is a photograph.",
@@ -20,7 +24,7 @@ window.XR_STRINGS = {
 
     "portfolio.eyebrow": "Portfolio",
     "portfolio.title": "Built from real products.",
-    "portfolio.body": "Drag to rotate. Open on your phone to place any of these in your space at true size.",
+    "portfolio.body": "Explore the possibilities. View on your phone for the full AR experience.",
     "portfolio.ar": "View in your space",
 
     "benefits.eyebrow": "The payoff",
@@ -32,7 +36,7 @@ window.XR_STRINGS = {
     "benefits.item3.title": "It spreads",
     "benefits.item3.body": "AR is the kind of thing people record and send to a friend. Every share puts your product in front of someone new. Effectively free marketing at no extra cost.",
 
-    "howwework.title": "You bring the product. We handle the rest.",
+    "howwework.title": "All we need from you is the product.",
     "howwework.step1.title": "Discuss",
     "howwework.step1.body": "We pick the products with the most to gain from 3D: the ones people want to turn over before they commit. You point them out, we plan the shoot.",
     "howwework.step2.title": "Scan",
@@ -43,14 +47,6 @@ window.XR_STRINGS = {
     "howwework.step4.body": "You get a link and a QR code, ready for a shelf, a table, or your website. Customers point their camera and it's there.",
 
     "process.eyebrow": "How it works",
-    "process.title": "Scan. Rebuild. Deliver.",
-    "process.step1.title": "Scan",
-    "process.step1.body": "We photograph and scan your physical product, in our studio or at your location. No design files needed; the object itself is the source.",
-    "process.step2.title": "Rebuild",
-    "process.step2.body": "The scan is rebuilt into a clean, lightweight 3D model with accurate materials (glass, liquid, label print, packaging texture) tuned to load fast on any phone.",
-    "process.step3.title": "Deliver",
-    "process.step3.body": "You get a link and a QR code. Customers point their camera and see your product in their space, at exact real-world size. No app to install.",
-    "process.note": "Typical turnaround is 5–10 working days per product, depending on complexity. Web viewers, AR (iOS + Android), and menu or catalog integration are all included deliverables.",
 
     "faq.eyebrow": "FAQ",
     "faq.title": "Common questions",
@@ -74,8 +70,13 @@ window.XR_STRINGS = {
     "cta.waPrefill": "Hi XRZENO, I'd like to talk about 3D/AR visualization for my product.",
 
     "footer.tagline": "WebAR & product visualization",
+    "footer.studioLabel": "Studio",
+    "footer.location": "Tangerang Selatan, Banten, Indonesia",
+    "footer.hours": "Mon–Fri, 9am–6pm",
+    "footer.contactLabel": "Contact",
+    "footer.wa": "WhatsApp",
     "footer.privacy": "Privacy",
-    "footer.rights": "© XRZENO. All rights reserved."
+    "footer.rights": "© 2026 XRZENO. All rights reserved."
   },
 
   id: {
@@ -84,8 +85,12 @@ window.XR_STRINGS = {
     "drawer.process": "Cara kerja",
     "drawer.faq": "FAQ",
     "drawer.contact": "Kontak",
+    "drawer.about": "Tentang",
     "drawer.whatsapp": "Chat via WhatsApp",
     "drawer.lang": "English",
+    "about.p1": "XRZENO adalah studio visualisasi produk WebAR di Tangerang Selatan, Banten. Kami mulai di awal 2026 karena tidak seharusnya orang menebak wujud produk hanya dari foto.",
+    "about.p2": "Maka kami memindai produk asli dan membangunnya kembali menjadi model 3D akurat yang bisa diputar pelanggan, dan ditempatkan di ruang mereka sendiri dengan ukuran nyata, langsung dari browser. Tanpa perlu aplikasi.",
+    "about.p3": "Kami membangun untuk semua skala, dari satu toko hingga katalog besar, dengan proses yang cepat dan harga yang transparan.",
 
     "compare.eyebrow": "Asli vs Render",
     "compare.title": "Salah satunya adalah foto.",
@@ -95,7 +100,7 @@ window.XR_STRINGS = {
 
     "portfolio.eyebrow": "Portofolio",
     "portfolio.title": "Dibuat dari produk asli.",
-    "portfolio.body": "Geser untuk memutar. Buka di ponsel untuk menempatkan produk di ruangan Anda dengan ukuran sebenarnya.",
+    "portfolio.body": "Jelajahi kemungkinannya. Buka di ponsel untuk pengalaman AR sepenuhnya.",
     "portfolio.ar": "Lihat di ruangan Anda",
 
     "benefits.eyebrow": "Hasilnya",
@@ -107,7 +112,7 @@ window.XR_STRINGS = {
     "benefits.item3.title": "Menyebar sendiri",
     "benefits.item3.body": "AR adalah hal yang direkam pelanggan lalu dikirim ke teman. Setiap kali dibagikan, produk Anda tampil ke orang baru. Praktis jadi promosi gratis tanpa biaya tambahan.",
 
-    "howwework.title": "Anda bawa produknya. Sisanya kami yang urus.",
+    "howwework.title": "Yang kami butuhkan dari Anda hanya produknya.",
     "howwework.step1.title": "Diskusi",
     "howwework.step1.body": "Kami pilih produk yang paling diuntungkan dengan tampilan 3D: yang ingin dilihat pelanggan dari dekat sebelum membeli. Anda tunjukkan, kami rencanakan pemotretannya.",
     "howwework.step2.title": "Scan",
@@ -118,14 +123,6 @@ window.XR_STRINGS = {
     "howwework.step4.body": "Anda menerima link dan kode QR, siap untuk rak, meja, atau situs web Anda. Pelanggan cukup arahkan kamera, dan produk langsung muncul.",
 
     "process.eyebrow": "Cara kerja",
-    "process.title": "Scan. Rebuild. Deliver.",
-    "process.step1.title": "Scan",
-    "process.step1.body": "Kami memotret dan memindai produk fisik Anda, di studio kami atau di lokasi Anda. Tidak perlu file desain; objek aslinya adalah sumbernya.",
-    "process.step2.title": "Rebuild",
-    "process.step2.body": "Hasil scan dibangun ulang menjadi model 3D yang ringan dan rapi dengan material akurat (kaca, cairan, cetakan label, tekstur kemasan) dioptimalkan agar cepat dibuka di ponsel apa pun.",
-    "process.step3.title": "Deliver",
-    "process.step3.body": "Anda menerima link dan kode QR. Pelanggan cukup mengarahkan kamera dan melihat produk Anda di ruangan mereka, dengan ukuran nyata. Tanpa install aplikasi.",
-    "process.note": "Pengerjaan umumnya 5–10 hari kerja per produk, tergantung kompleksitas. Viewer web, AR (iOS + Android), dan integrasi menu atau katalog sudah termasuk.",
 
     "faq.eyebrow": "FAQ",
     "faq.title": "Pertanyaan umum",
@@ -149,7 +146,12 @@ window.XR_STRINGS = {
     "cta.waPrefill": "Halo XRZENO, saya ingin diskusi visualisasi 3D/AR untuk produk saya.",
 
     "footer.tagline": "WebAR & visualisasi produk",
+    "footer.studioLabel": "Studio",
+    "footer.location": "Tangerang Selatan, Banten, Indonesia",
+    "footer.hours": "Sen–Jum, 09.00–18.00",
+    "footer.contactLabel": "Kontak",
+    "footer.wa": "WhatsApp",
     "footer.privacy": "Privasi",
-    "footer.rights": "© XRZENO. Hak cipta dilindungi."
+    "footer.rights": "© 2026 XRZENO. Hak cipta dilindungi."
   }
 };
