@@ -27,51 +27,36 @@ each session.
 ## Files & git
 - Repo: **github.com/ektjio-code/xr_landing_page** (`origin`/`main`). Pages (real AR + phone testing):
   `ektjio-code.github.io/xr_landing_page/` — phones can't reach localhost, so **push before phone testing.**
-- **Truth files (repo root):** **`index_v3.html`** = ACTIVE, single responsive (desktop + mobile) · `index_v2.html`
-  = desktop fallback · `index.html` = LEGACY mobile (superseded, pending retirement — flip the line-8 redirect) ·
-  `strings.js` = EN+ID copy.
-- Helpers at root (committed): `squiggle-scroll.html` / `squiggle-demo.html` (squiggle prototypes) +
-  `xrzeno-bleed-transition-demo-v2.html` (Print Pass reference). `Backup/` is gitignored (local snapshots).
+- **Truth files (repo root):** **`index.html`** = THE SITE, a SINGLE responsive file serving BOTH desktop and mobile
+  (renamed from `index_v3.html` on 2026-07-15; the device-split redirect is GONE). `strings.js` = EN+ID copy, loaded
+  as **`strings.js?v=N`** (bump `N` on every edit or a cached copy overrides it). `Tokonama Scene/` = desktop tokonoma
+  glb + EXR. `Backup/` = gitignored local snapshots.
+- **2026-07-15 repo purge:** `index_v2.html`, the old legacy `index.html`, the stale `index_v3.min.html`, every lab
+  (`*-lab*.html` + scene experiments), the strip-build (`build.mjs` + `package*.json`), unused Shinobu source/render
+  images, `xrzeno_logo.jpeg`, and the `xrzeno-concept` package were ALL DELETED. Repo = the site + only the assets it
+  references. ⚠️ **Older session entries below still say `index_v3.html` (= now `index.html`) and mention labs that no
+  longer exist** — treat those as history.
 - `.git` writes intermittently fail (OneDrive/AV lock) — e.g. `update_ref failed for refs/remotes/...`, or
   `couldn't set refs/heads/main`. **Pushes still land** — verify with `git ls-remote origin -h
   refs/heads/main`; clear stale `.git/*.lock` and retry if a write errors.
 
 ## How to run / test
-- Serve repo root: `python -m http.server 8000 --bind 127.0.0.1` → `http://127.0.0.1:8000/index_v3.html?stay`
-  (`?stay` overrides the device redirect). `index_v2.html?stay` for the old cinematic. `&lang=id` or the
-  drawer toggle for Indonesian.
-- After a JS edit, extract each `<script>` and `node --check` it (v3 = 1 module + several classic scripts:
-  strips scrim, squiggle bg, body-motion, focus-cards). If patches don't show, suspect **browser cache /
-  stacked servers.**
+- Serve repo root: `python -m http.server 8000 --bind 127.0.0.1` → **`http://127.0.0.1:8000/`** (serves `index.html`
+  by default; NO `?stay` — the redirect is gone). `&lang=id` or the drawer toggle for Indonesian.
+- After a JS edit, extract each `<script>` and `node --check` it (1 module + several classic scripts). If patches
+  don't show, suspect **browser cache** — `strings.js` caches HARDER than the HTML (a plain reload re-fetches the page
+  but reuses the cached `strings.js`), so **bump `strings.js?v=N` in `index.html`** and verify the SERVED bytes with
+  `curl http://127.0.0.1:8000/strings.js` rather than trusting the browser. (This cost a real debug round-trip.)
+- Real AR + phone testing: push, then open the Pages URL on the phone (`ektjio-code.github.io/xr_landing_page/`).
 
-## Ship polish — kill the "made by AI" tells (audit 2026-07-13)
-The repo is **PUBLIC** and this is a **craft studio's** site — obviously-AI prose in the source/copy undercuts
-the pitch. The code LOGIC / naming (`pmx`,`curF`,`exitP`) / architecture read hand-built (leave them). The tell
-is the **PROSE** — comments + copy. Three to-dos:
-
-1. **Source comments — DONE via build, PENDING deploy-wiring.** `index_v3.html` had **125 em-dashes (—) + 138
-   arrows (→)** in comments plus narrator "explain-the-why" verbosity = textbook AI. Fixed by the strip build
-   (below): `index_v3.min.html` removes ALL comments. ⚠️ NOT live until the `.min` becomes the served entry —
-   pairs with the **retire-`index.html` / line-8-redirect flip** (rename `index_v3.min.html`→`index.html` or
-   point the entry at it). Until then, View-Source / the public repo still expose the notes.
-2. **Copy dashes — DEFERRED launch copy-sweep (separate job).** Em-dashes in USER-VISIBLE text: `strings.js`
-   (~15), the `<title>` **`XRZENO — Scene`** (browser tab — and "Scene" is a leftover; set the real tagline),
-   `Shinobu — whisky bottle`, `Asset 2/3 — title`, and the iOS motion toast `iOS remembers this — Settings → …`.
-   Replace `—` with commas / periods / rewrites. See [[project-dash-sweep-finalization]].
-3. **Copy CADENCE — the subtler tell (do with the sweep).** AI marketing rhythm: the staccato triad
-   `Scan. Rebuild. Deliver.`, balanced antithesis lines, rule-of-N lists (`glass, liquid, label print, packaging
-   texture`). Loosen the rhythm so it reads human, not generated.
-
-### Build — the strip step (added 2026-07-13)
-`index_v3.html` stays the commented working **source** (edit as normal). `npm install` once, then **`npm run
-build`** → **`index_v3.min.html`** at the repo root with every HTML/CSS/JS comment removed via REAL parsers
-(html-minifier-terser → clean-css + terser). **JS compress + mangle are OFF** — comment-removal only, so the
-WebGL/three.js code is behaviourally identical and GLSL shader template-literals / `https` URLs / string literals
-are never touched. Output at root so relative asset paths (`strings.js`, `shinobu.glb`, `Tokonama Scene/`, AR)
-resolve. `node_modules/` gitignored; commit `index_v3.min.html` + `package.json`/lock. **Verify after build:**
-`node --check` each `<script>` in the `.min`; `#version 300 es` / `gl_Position` occurrence counts match the
-source (shaders intact); importmap parses as JSON. (2026-07-13 run: 165KB→112KB, comment em-dashes 125→8, the
-8 remaining = visible copy = job #2 above.)
+## Ship polish — AI tells (DONE 2026-07-15)
+- **Copy:** the em-dash/arrow sweep is DONE across ALL visible copy (EN+ID); `<title>` = just `XRZENO`. Cadence tells
+  handled — the `Scan. Rebuild. Deliver.` staccato triad + the rule-of-N list lived in the now-DELETED orphan
+  `process.*` strings. Ed keeps `cta.title` ("Show your product, not a picture of it") + `howwework.step1` as-is; the
+  rest of the launch-copy cadence is his manual call.
+- **Source comments:** the strip-build (`index_v3.min.html` + `build.mjs` + `package*.json`) was **DELETED** — Ed's
+  call that `index.html` itself is the served file, so code comments are now visible in View-Source (accepted
+  tradeoff). If it ever matters, re-strip with a one-off tool; do NOT re-introduce a build step without asking.
 
 ---
 
@@ -113,9 +98,12 @@ Content-fill + polish pass on `index_v3.html` + `strings.js` (both languages). A
 - **Cache gotcha fixed:** `strings.js` is now loaded as **`strings.js?v=2`** — a plain reload re-fetches the HTML but reuses a
   cached `strings.js`, which kept showing stale copy (cost a round-trip debugging a "phantom" em-dash). **Bump the `?v=`
   whenever you edit `strings.js`.** (Verify served content with `curl`, don't trust the browser.)
-- ⚠️ **STILL THE KEY DEPLOY BLOCKER:** the **line-8 device redirect still sends phones to `index.html`** (the old legacy
-  mobile) unless `?stay`. v3 is the responsive file, but real phones won't see it until that redirect is flipped/removed.
-  Retire `index.html` at the same time. Not done this session.
+- ✅ **DEPLOY BLOCKER RESOLVED (later same session):** the device-split redirect was **removed** and `index_v3.html`
+  **renamed to `index.html`** — it now serves BOTH desktop and mobile directly, no `?stay`, no bounce. The old legacy
+  `index.html` was deleted. Repo purged to the site + only-used assets (see "Files & git"). **Deploy-ready**; remaining
+  non-blockers: OG image is the old restaurant-menu card on the old server (regenerate + vendor a product-viz one),
+  `/privacy` has no page, Threads handle unverified, and code comments now ship in `index.html` (Ed OK'd). Phone-test
+  the mobile scene → Payoff reveal on the Pages URL.
 
 ### Session 2026-07-14 — portfolio rebuilt (real assets), desktop hover-3D, drawer + mobile-AR fixes, USDZ compressor fix
 **Compare "Real vs Render" (`#cmp`) — DONE, real images.** Ed used **Shinobu** after all: photo `Shinobu studio
@@ -292,18 +280,18 @@ EXCEPT shake/tilt. `?stay` is REQUIRED everywhere — line 8 redirects phones to
 - ✅ Done 2026-07-11: **scan-field bg** (replaced squiggle) · **Method-A exit wipe** + **FAQ reveal-in-place**
   (replaced the CSS-mask exit + `#processResume`) · **emissive card frames + shadows** (replaced a sheen
   attempt) · scene card always-opaque · DELIVER load-flash fixed · **autoplay-scroll on How-it-works**.
-1. ✅ **Ported v3 to MOBILE (2026-07-13)** — full responsive port; see "Mobile v3" above (Shinobu How-it-works,
-   turntable, tilt bg, shake, jank/overflow fixes). REMAINING: flip the line-8 device redirect → retire
-   `index.html`; featured-card `.fcard` depth-canvas → plain `<img>` on mobile (Ed OK'd, not built).
+1. ✅ **Ported v3 to MOBILE (2026-07-13)** — full responsive port; see "Mobile v3" above. **Redirect flip + `index.html`
+   retirement = ✅ DONE 2026-07-15** (v3 renamed to `index.html`, serves both desktop + mobile). (`.fcard` depth-canvas
+   is moot — featured cards were rebuilt to plain `<img>` in the 2026-07-14 portfolio rebuild.)
 - ✅ Done 2026-07-14: **compare real images** (Shinobu photo + hand-aligned render) · **portfolio fully rebuilt**
   (2 web-demo cards + 3 product cards, no inline 3D) · **desktop hover-3D turntable** on the AR cards · **drawer**
   centered-icons + WhatsApp `100dvh` fix · **mobile Shinobu "View In Your Space" AR** · **USDZ compressor bug fixed**
   (Pizza black-cheese) + `Pizza_slim.usdz` re-slimmed.
-2. **Real assets — DONE** except **real social handles** for the 5 drawer icons (`instagram.com/xrzeno` etc. are
-   still placeholders).
-3. **▶ TOMORROW (2026-07-14 EOD hand-off): COPYWRITING** — the launch copy dash-sweep + real copy. Strip AI-dash
-   tells from `strings.js` (EN+ID) + body copy; set the real `<title>` (currently `XRZENO — Scene`, "Scene" is a
-   leftover); fix the portfolio/compare/toast copy. See [[project-dash-sweep-finalization]].
+2. **Real assets — DONE.** Social handles = ✅ real ones wired 2026-07-15 (IG `xrzeno.ar`, TikTok `@xrzeno.ar`, FB
+   `61576647629594`, X `xrzeno`, + YouTube `@hello.xrzeno`; **Threads `@xrzeno` still UNVERIFIED**).
+3. **COPYWRITING — ✅ DONE 2026-07-15.** Dash/arrow sweep across all visible copy (EN+ID); `<title>` = `XRZENO`;
+   portfolio/compare/toast copy fixed; new Benefits + How-it-works + About + footer copy written; orphan `process.*`
+   strings deleted. Only Ed's own manual cadence pass on the remaining lines is left.
 - **Parked (Ed, revisit):** the scene-card opacity "still out of place" per Ed — he made it opaque but wasn't
   100% happy; nail down exactly what's off when he flags it. Also floated but not built: warping the *photo*
   inside a frame WITH the magnet (SVG `feDisplacementMap` for flat photos / vertex warp on the WebGL focus-pull
