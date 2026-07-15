@@ -7,9 +7,8 @@ desktop.ini
 files.zip
 Backup/
 
-# Claude Code local + temp files
-.claude/settings.local.json
-.claude/*.tmp*
+# Claude Code local + temp files (never commit any .claude/, at any depth)
+.claude/
 
 # build tooling
 node_modules/
