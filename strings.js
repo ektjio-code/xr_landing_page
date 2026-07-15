@@ -5,6 +5,7 @@
 window.XR_STRINGS = {
   en: {
     "drawer.portfolio": "Portfolio",
+    "drawer.benefits": "Benefits",
     "drawer.process": "How it works",
     "drawer.faq": "FAQ",
     "drawer.contact": "Contact",
@@ -21,6 +22,25 @@ window.XR_STRINGS = {
     "portfolio.title": "Built from real products.",
     "portfolio.body": "Drag to rotate. Open on your phone to place any of these in your space at true size.",
     "portfolio.ar": "View in your space",
+
+    "benefits.eyebrow": "The payoff",
+    "benefits.title": "People buy what they can see.",
+    "benefits.item1.title": "They trade up",
+    "benefits.item1.body": "Let a customer turn your product over at real size and the pricier option stops feeling like a gamble. They reach for it because they already know what they're getting.",
+    "benefits.item2.title": "No surprises",
+    "benefits.item2.body": "A customer who has set your product on their own table knows exactly what will arrive. The expectation is set before the sale, so far fewer products get returned.",
+    "benefits.item3.title": "It spreads",
+    "benefits.item3.body": "AR is the kind of thing people record and send to a friend. Every share puts your product in front of someone new. Effectively free marketing at no extra cost.",
+
+    "howwework.title": "You bring the product. We handle the rest.",
+    "howwework.step1.title": "Discuss",
+    "howwework.step1.body": "We pick the products with the most to gain from 3D: the ones people want to turn over before they commit. You point them out, we plan the shoot.",
+    "howwework.step2.title": "Scan",
+    "howwework.step2.body": "Our team captures the real product in detail, at our studio or on your site.",
+    "howwework.step3.title": "Build",
+    "howwework.step3.body": "That capture becomes a clean, accurate 3D model, tuned to load fast on any phone.",
+    "howwework.step4.title": "Deliver",
+    "howwework.step4.body": "You get a link and a QR code, ready for a shelf, a table, or your website. Customers point their camera and it's there.",
 
     "process.eyebrow": "How it works",
     "process.title": "Scan. Rebuild. Deliver.",
@@ -60,6 +80,7 @@ window.XR_STRINGS = {
 
   id: {
     "drawer.portfolio": "Portofolio",
+    "drawer.benefits": "Keuntungan",
     "drawer.process": "Cara kerja",
     "drawer.faq": "FAQ",
     "drawer.contact": "Kontak",
@@ -76,6 +97,25 @@ window.XR_STRINGS = {
     "portfolio.title": "Dibuat dari produk asli.",
     "portfolio.body": "Geser untuk memutar. Buka di ponsel untuk menempatkan produk di ruangan Anda dengan ukuran sebenarnya.",
     "portfolio.ar": "Lihat di ruangan Anda",
+
+    "benefits.eyebrow": "Hasilnya",
+    "benefits.title": "Orang membeli apa yang bisa mereka lihat.",
+    "benefits.item1.title": "Mereka pilih yang lebih premium",
+    "benefits.item1.body": "Saat pelanggan bisa memutar produk Anda dalam ukuran asli, opsi yang lebih mahal tak lagi terasa berisiko. Mereka memilihnya karena sudah tahu persis apa yang akan didapat.",
+    "benefits.item2.title": "Tanpa kejutan",
+    "benefits.item2.body": "Pelanggan yang sudah menaruh produk Anda di meja sendiri tahu persis apa yang akan datang. Ekspektasi terbentuk sebelum membeli, jadi jauh lebih sedikit yang kembali setelahnya.",
+    "benefits.item3.title": "Menyebar sendiri",
+    "benefits.item3.body": "AR adalah hal yang direkam pelanggan lalu dikirim ke teman. Setiap kali dibagikan, produk Anda tampil ke orang baru. Praktis jadi promosi gratis tanpa biaya tambahan.",
+
+    "howwework.title": "Anda bawa produknya. Sisanya kami yang urus.",
+    "howwework.step1.title": "Diskusi",
+    "howwework.step1.body": "Kami pilih produk yang paling diuntungkan dengan tampilan 3D: yang ingin dilihat pelanggan dari dekat sebelum membeli. Anda tunjukkan, kami rencanakan pemotretannya.",
+    "howwework.step2.title": "Scan",
+    "howwework.step2.body": "Tim kami mengambil detail produk asli Anda, di studio kami atau di lokasi Anda.",
+    "howwework.step3.title": "Produksi 3D",
+    "howwework.step3.body": "Hasil pemotretan itu kami bangun jadi model 3D yang rapi dan akurat, dioptimalkan agar cepat dibuka di ponsel apa pun.",
+    "howwework.step4.title": "Siap Digunakan",
+    "howwework.step4.body": "Anda menerima link dan kode QR, siap untuk rak, meja, atau situs web Anda. Pelanggan cukup arahkan kamera, dan produk langsung muncul.",
 
     "process.eyebrow": "Cara kerja",
     "process.title": "Scan. Rebuild. Deliver.",

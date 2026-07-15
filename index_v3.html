@@ -294,7 +294,7 @@
      MATH: runway sp maps to ~340vh of scroll; wipe = sp .67→1.0 = the last ~112vh. overlap 240vh → pin starts ~sp .59 (safely before the bars); pin 180vh → holds through the wipe + ~40vh past, then releases. */
   :root{--faq-overlap:240vh; --faq-pin:180vh}
   #faqReveal{position:relative;margin-top:calc(-1 * var(--faq-overlap));height:calc(100vh + var(--faq-pin))}
-  #faqReveal>#faq{position:sticky;top:0;min-height:100vh;margin:0}   /* min-height fills the viewport so the strips reveal a full screen of FAQ; content keeps its natural size/top-flow (no flex-centering — that made the collapsed FAQ look shrunken) */
+  #faqReveal>#benefits{position:sticky;top:0;min-height:100vh;margin:0}   /* min-height fills the viewport so the strips reveal a full screen of the pinned section; content keeps its natural size/top-flow (no flex-centering) */
 </style>
 </head>
 <body>
@@ -317,6 +317,7 @@
 <div id="scrim"></div>
 <nav id="drawer" aria-label="Site navigation">
   <a href="#portfolio" data-nav="portfolio" data-i18n="drawer.portfolio">Portfolio</a>
+  <a href="#benefits"  data-nav="benefits"  data-i18n="drawer.benefits">Benefits</a>
   <a href="#process"   data-nav="process"   data-i18n="drawer.process">How it works</a>
   <a href="#faq"       data-nav="faq"        data-i18n="drawer.faq">FAQ</a>
   <a href="#contact"   data-nav="contact"    data-i18n="drawer.contact">Contact</a>
@@ -410,16 +411,61 @@
   </div>
 </section>
 
-<section class="sect" id="process">
+<section class="sect" id="howwework">
   <div class="wrap">
     <div class="eyebrow" data-i18n="process.eyebrow">How it works</div>
+    <h2 data-i18n="howwework.title">You bring the product. We handle the rest.</h2>
+    <div class="steps">
+      <div class="step">
+        <h3 data-i18n="howwework.step1.title">Discuss</h3>
+        <p data-i18n="howwework.step1.body">We pick the products with the most to gain from 3D: the ones people want to turn over before they commit. You point them out, we plan the shoot.</p>
+      </div>
+      <div class="step">
+        <h3 data-i18n="howwework.step2.title">Scan</h3>
+        <p data-i18n="howwework.step2.body">Our team captures the real product in detail, at our studio or on your site.</p>
+      </div>
+      <div class="step">
+        <h3 data-i18n="howwework.step3.title">Build</h3>
+        <p data-i18n="howwework.step3.body">That capture becomes a clean, accurate 3D model, tuned to load fast on any phone.</p>
+      </div>
+      <div class="step">
+        <h3 data-i18n="howwework.step4.title">Deliver</h3>
+        <p data-i18n="howwework.step4.body">You get a link and a QR code, ready for a shelf, a table, or your website. Customers point their camera and it's there.</p>
+      </div>
+    </div>
   </div>
+</section>
+
+<section class="sect" id="process">
+  <!-- v3: eyebrow/heading now live in the #howwework lead block above; this section is the scene runway only (keeps its scroll math clean) -->
   <!-- v3: the embedded scene window (Lusion astronaut framing) — a sticky stage PINS the card at viewport centre; the fixed #gl canvas is clip-path'd to the card box, so it reads as a card in the page that opens to fullscreen on a time tween once scroll reaches it -->
   <div id="sceneStage" aria-hidden="true"><div id="sceneWindow"></div></div>
 </section>
 
-<!-- v3: the exit strips reveal the FAQ IN PLACE. #faqReveal overlaps the scene's final screen (margin-top:-var(--faq-overlap)) and PINS the FAQ (sticky) behind the fullscreen scene, so the rising bars uncover it like a curtain off a poster — no scroll-slide. After the pin runway it releases into normal scroll (→ Contact). Knobs: --faq-overlap (when the pin starts, vs the wipe) / --faq-pin (how long it stays pinned). -->
+<!-- v3: the exit strips reveal THE PAYOFF in place (was the FAQ). #faqReveal overlaps the scene's final screen (margin-top:-var(--faq-overlap)) and PINS the pinned section (sticky) behind the fullscreen scene, so the rising bars uncover it like a curtain off a poster. After the pin runway it releases into normal scroll; the FAQ now follows below. Knobs: --faq-overlap / --faq-pin. -->
 <div id="faqReveal">
+<section class="sect" id="benefits">
+  <div class="wrap">
+    <div class="eyebrow" data-i18n="benefits.eyebrow">The payoff</div>
+    <h2 data-i18n="benefits.title">People buy what they can see.</h2>
+    <div class="steps">
+      <div class="step">
+        <h3 data-i18n="benefits.item1.title">They trade up</h3>
+        <p data-i18n="benefits.item1.body">Let a customer turn your product over at real size and the pricier option stops feeling like a gamble. They reach for it because they already know what they're getting.</p>
+      </div>
+      <div class="step">
+        <h3 data-i18n="benefits.item2.title">No surprises</h3>
+        <p data-i18n="benefits.item2.body">A customer who has set your product on their own table knows exactly what will arrive. The expectation is set before the sale, so far fewer products get returned.</p>
+      </div>
+      <div class="step">
+        <h3 data-i18n="benefits.item3.title">It spreads</h3>
+        <p data-i18n="benefits.item3.body">AR is the kind of thing people record and send to a friend. Every share puts your product in front of someone new. Effectively free marketing at no extra cost.</p>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+
 <section class="sect" id="faq">
   <div class="wrap faq">
     <div class="eyebrow" data-i18n="faq.eyebrow">FAQ</div>
@@ -432,7 +478,6 @@
     <details><summary data-i18n="faq.q6"></summary><p data-i18n="faq.a6"></p></details>
   </div>
 </section>
-</div>
 
 <section class="sect cta" id="contact">
   <div class="wrap">
